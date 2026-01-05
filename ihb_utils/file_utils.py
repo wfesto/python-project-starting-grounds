@@ -30,9 +30,18 @@ def recycle_file(file_path: str, do_check_dir=False) -> bool:
     file_path = Path(file_path).absolute()
 
     try:
-        send2trash(file_path)
-        logger.verbose(f"{file_path} recycled successfully.")
+        if os.path.exists(file_path):
+            dir = os.path.dirname(file_path)
+            send2trash(file_path)
+            logger.verbose(f"{file_path} recycled successfully.")
+
+            if len(os.listdir(dir)) == 0:
+                logger.info(f"{dir} is now empty")
+        else:
+            logger.warning(f"{file_path} does not exist, skipping recycling")
+
         return True
+
     except Exception as e:
         logger.verbose(f"Error recycling {file_path} - {e}")
         return False

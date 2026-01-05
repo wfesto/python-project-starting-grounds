@@ -168,6 +168,7 @@ def prompt_review_job(
     print(f"[e]x || Show Video file in [E]xplorer")
     print(f"[d]x || [D]elete Video file")
     print(f"[a]pprove job")
+    print(f"[x] Delete both files and mark job deleted")
     print(f"[r]eset job")
     print(f"[q]uit")
 
@@ -194,6 +195,12 @@ def prompt_review_job(
                 elif command == "a":
                     is_update = True
                     job_dto.status = Job_Status.COMPLETE
+
+                elif command == "x":
+                    is_update = True
+                    recycle_file(input_file)
+                    recycle_file(output_file)
+                    job_dto.status = Job_Status.DELETED
 
                 elif command in PROMPT_COMMANDS.keys():
                     file_choice = None

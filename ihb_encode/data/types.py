@@ -58,6 +58,7 @@ class Job_Status(IntEnum):
     COMPLETE = auto()
     ERROR = auto()
     MAN_APPR = auto()
+    DELETED = auto()
     UNKNOWN = 99
 
     def to_sql_params(self, language: str) -> Dict[str, Any]:
