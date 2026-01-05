@@ -212,12 +212,16 @@ def review_results():
     if not job_list:
         print("No jobs available to review.")
         return
+    job_count = len(job_list)
+    logger.info(f"{job_count} jobs to review")
+    job_idx = 0
 
     curr_job_prepx_results = encoder.JobPreprocessResult(None, None, None, None)
 
     curr_job = job_list.pop(0)
     next_job = job_list.pop(0) if job_list else None
     while True:
+        job_idx += 1
         next_job_prepx_results = encoder.JobPreprocessResult(None, None, None, None)
 
         if next_job:
@@ -227,6 +231,8 @@ def review_results():
             preprocess_thread = None
 
         logger.verbose(f"Next Job: {curr_job.job_id}")
+        logger.info(f"Progress: {job_idx}/{job_count}")
+
         if not _review_job(curr_job, curr_job_prepx_results):
             print("User terminated review.")
             break
