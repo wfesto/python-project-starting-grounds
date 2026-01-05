@@ -1,0 +1,19 @@
+# --- Databases and Secrets ---
+*.db
+*.db-journal
+*.yaml
+*.conf
+!ihb_encode/conf/config.py  # Keep your config templates if needed
+
+# --- Python Noise ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# --- One-off / Sandbox Files ---
+# This ignores common "test" names in the root directory
+*.log
+
+# --- Specific IHB scripts to exclude from "Clean" repo ---
