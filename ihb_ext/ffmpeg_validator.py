@@ -1,9 +1,8 @@
 import logging
-from dataclasses import dataclass
 from typing import Any, Dict, List
 
 from ihb_ext.ffprobe import _get_timecode_data
-from ihb_utils.video_models import Validation_Results_DTO
+from ihb_utils.video_models import Resolution, Validation_Results_DTO
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +38,15 @@ def _validate_duration_delta(old_probe_data: Dict[str, Any], new_probe_data: Dic
     duration_delta = abs(float(old_probe_data["format_data"]["duration"]) - float(new_probe_data["format_data"]["duration"]))
     result = duration_delta <= 0.05
     return Validation_Results_DTO("duration_delta", result, f"Duration delta {duration_delta:.04f} is {"" if result else "UN"}ACCEPTABLE")
+
+
+@register_test("aspect_ratio_delta")
+def _validate_aspect_ratio_delta(old_probe_data: Dict[str, Any], new_probe_data: Dict[str, Any]) -> Validation_Results_DTO:
+    old_ar_num = Resolution(old_probe_data["v_streams"][0]["width"], old_probe_data["v_streams"][0]["height"]).get_aspect_ratio_num()
+    new_ar_num = Resolution(new_probe_data["v_streams"][0]["width"], new_probe_data["v_streams"][0]["height"]).get_aspect_ratio_num()
+    ar_num_delta = abs(old_ar_num - new_ar_num)
+    result = ar_num_delta <= 0.005
+    return Validation_Results_DTO("duration_delta", result, f"Aspect Ratio delta {ar_num_delta:.04f} is {"" if result else "UN"}ACCEPTABLE")
 
 
 @register_test("timecodes")
