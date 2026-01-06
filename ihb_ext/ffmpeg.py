@@ -256,10 +256,12 @@ def _validate_encoding_job(job_dto: Encoding_Job_DTO, input_metadata: Dict[str, 
 
 def print_command(command: Dict[str, Any]):
     quoted_command = command.copy()
+    input_idx = 2
+    output_idx = -1
     #    input_idx = 2 + (2 if is_fix_pts else 0)
-    quoted_command[2] = f'"{command[0]}"'
+    quoted_command[input_idx] = f'"{command[input_idx]}"'
     #   quoted_command[input_idx] = f'"{command[input_idx]}"'
-    quoted_command[-1] = f'"{command[-1]}"'
+    quoted_command[output_idx] = f'"{command[output_idx]}"'
 
     logger.info("--------------------------------")
     logger.info(" ".join(quoted_command))

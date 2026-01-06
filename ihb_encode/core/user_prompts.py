@@ -217,7 +217,7 @@ def prompt_review_job(
                     if file_choice:
                         try:
                             PROMPT_COMMANDS[command](PurePath(file_choice))
-                            logger.info(f"{PROMPT_COMMANDS[command]} executed on {file_choice}")
+                            logger.verbose(f"{PROMPT_COMMANDS[command]} executed on {file_choice}")
                         except Exception as e:
                             logger.error(f"{e}", stack_info=True)
                 else:

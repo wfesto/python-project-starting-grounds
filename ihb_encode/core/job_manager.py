@@ -231,7 +231,7 @@ def review_results():
             preprocess_thread = None
 
         logger.verbose(f"Next Job: {curr_job.job_id}")
-        logger.info(f"Progress: {job_idx}/{job_count}")
+        logger.info(f"Progress: {job_idx}/{job_count} ({job_count - job_idx} remaining)")
 
         if not _review_job(curr_job, curr_job_prepx_results):
             print("User terminated review.")
