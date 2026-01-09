@@ -1,14 +1,14 @@
 import logging
 import os
 from pathlib import PurePath
-from typing import Any, Dict
+from typing import Any
 
 from ihb_ext import video_manager
 from ihb_utils import video_utils
 from ihb_utils.color_codes import TerminalColorCodes
 from ihb_utils.file_utils import open_explorer_highlight_file, recycle_file
 from ihb_utils.gen_utils import generate_aligned_table
-from ihb_utils.video_models import VideoMetrics
+from ihb_utils.video_models import Validation_Results_DTO, VideoMetrics
 
 from ..data.types import *
 
@@ -25,7 +25,7 @@ def _get_prompt_video_data(file_metadata) -> str:
     return "\n".join(prompt_data)
 
 
-def _get_prompt_string(v_stream: Dict[str, Any]) -> str:
+def _get_prompt_string(v_stream: dict[str, Any]) -> str:
     prompt_string = []
 
     width = v_stream["width"]
@@ -57,7 +57,7 @@ def _get_prompt_adv_opts(adv_opts: Advanced_Options_DTO):
     return "\n".join(adv_opts_prompt)
 
 
-def prompt_encoding_profile(input_metadata: Dict[str, Any], adv_opts: Advanced_Options_DTO) -> Profile:
+def prompt_encoding_profile(input_metadata: dict[str, Any], adv_opts: Advanced_Options_DTO) -> Profile:
     chosen_profile = None
     video_data_str = _get_prompt_video_data(input_metadata)
     prompt_str = _get_prompt_string(input_metadata["v_streams"][0])
@@ -108,8 +108,8 @@ def prompt_encoding_profile(input_metadata: Dict[str, Any], adv_opts: Advanced_O
 
 def prompt_review_job(
     job_dto: Encoding_Job_DTO,
-    input_metadata: Dict[str, Any] = None,
-    output_metadata: Dict[str, Any] = None,
+    input_metadata: dict[str, Any] = None,
+    output_metadata: dict[str, Any] = None,
     old_metrics: VideoMetrics = None,
     new_metrics: VideoMetrics = None,
 ) -> bool:

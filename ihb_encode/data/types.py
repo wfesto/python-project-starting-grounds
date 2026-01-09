@@ -4,12 +4,36 @@ from dataclasses import asdict, dataclass, field, fields
 from enum import Enum, IntEnum, auto
 from pathlib import PurePath
 from sqlite3 import Row
-from typing import Any, Dict, List
+from typing import Any
 
 from humanfriendly import format_size
 
 from ihb_utils.gen_utils import format_time
-from ihb_utils.video_models import Validation_Results_DTO
+
+
+@dataclass(frozen=True)
+class CliArgument:
+    flag: str
+    name: str
+    help: str = None
+    type: type = None
+    action: str = None
+    nargs: str = None
+
+    def get_args(self) -> tuple[str, str]:
+        return f"-{self.flag}", f"--{self.name}"
+
+    def get_kwargs(self) -> dict[str, Any]:
+        kwargs = {}
+
+        for key, value in asdict(self).items():
+            if value:
+                kwargs[key] = value
+
+        kwargs.pop("flag")
+        kwargs.pop("name")
+
+        return kwargs
 
 
 @dataclass(frozen=True)
@@ -20,7 +44,7 @@ class EncodingProfile:
     scaled_dim: int
     crf: int
     encoder_preset: str
-    params_x265: List[str]
+    params_x265: list[str]
     is_source: bool
 
 
@@ -61,7 +85,7 @@ class Job_Status(IntEnum):
     DELETED = auto()
     UNKNOWN = 99
 
-    def to_sql_params(self, language: str) -> Dict[str, Any]:
+    def to_sql_params(self, language: str) -> dict[str, Any]:
         sql_params = {}
         sql_params["status"] = self.value
         sql_params["status_name"] = self.name
@@ -79,7 +103,7 @@ class Encoding_Job_DTO:
     size_in: int
     size_out: int = None
     status: Job_Status = None
-    notes: Dict[str, Any] = field(default_factory=dict)
+    notes: dict[str, Any] = field(default_factory=dict)
     adv_params: Advanced_Options_DTO = None
 
     def to_pretty_string(self):

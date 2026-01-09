@@ -1,56 +1,46 @@
 import logging
 import os
 from pathlib import PurePath
-from typing import List
 
 from humanfriendly import format_size
 from send2trash import send2trash
 
 from ihb_utils.gen_utils import generate_aligned_table
 
-from ..data import db_manager
-from ..data.types import *
+from ..data import *
 
 logger = logging.getLogger(__name__)
 
 
+CLI_HELP = "Basic DB operations"
 COMMAND_MAP = {}
+FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
+
+CLI_JOB_ID = CliArgument(flag="j", name="job-id", help="Job ID to modify", type=int)
+CLI_SIZE_MAX = CliArgument(flag="z", name="size-max", help="Maximum output size to bulk approve", type=int)
 
 
-def get_actions() -> List[str]:
-    return list(COMMAND_MAP.keys())
-
-
-def register_command(keyword):
+def register_command(keyword: str, *cli_args: CliArgument):
     def decorator(func):
         COMMAND_MAP[keyword] = func
+        if cli_args:
+            FLAG_MAP[keyword] = cli_args
         return func
 
     return decorator
 
 
-def execute_action(*args, **kwargs):
-    action = kwargs["action"]
-    if method := COMMAND_MAP.get(action):
-        try:
-            logger.info(f"Executing {action}")
-            args_dict = {k: v for k, v in kwargs.items() if v is not None}
-            return method(*args, **args_dict)
-        except Exception as e:
-            logger.error(f"Error executing {action}: {str(e)}", exc_info=True)
-    else:
-        logger.error(f"Undefined action: {action}")
-
-
-@register_command("current-jobs")
+@register_command("current-jobs", CLI_SIZE_MAX)
 def _get_jobs(*args, **kwargs):
     limit = int(kwargs.get("size_max", 1))
     if job_list := db_manager.get_next_job_by_status(Job_Status.WORKING, limit):
         print(str(job_list[0]))
         print(job_list[0].to_pretty_string())
+    else:
+        print("No jobs in progress.")
 
 
-@register_command("reset-job")
+@register_command("reset-job", CLI_JOB_ID)
 def _get_reset_job(*args, **kwargs):
     job_id = kwargs["job_id"]
     logger.info(f"Resettng {job_id} to status {Job_Status.PENDING.name}")
@@ -58,14 +48,16 @@ def _get_reset_job(*args, **kwargs):
     logger.info(f"Update {job_id} is {"NOT" if is_succcess else ""} successful")
 
 
-@register_command("list-errors")
+@register_command("list-errors", CLI_SIZE_MAX)
 def _get_error_Jobs(*args, **kwargs):
     limit = int(kwargs.get("size_max", 5))
-    job_list = db_manager.get_next_job_by_status(Job_Status.ERROR, limit)
-    print("\n".join(str(dto) for dto in job_list))
+    if job_list := db_manager.get_next_job_by_status(Job_Status.ERROR, limit):
+        print("\n".join(str(dto) for dto in job_list))
+    else:
+        print("No errors found")
 
 
-@register_command("list-jobs")
+@register_command("list-jobs", CLI_SIZE_MAX)
 def _get_jobs(*args, **kwargs):
     limit = int(kwargs.get("size_max", 5))
     job_list = db_manager.get_next_job_by_status(Job_Status.PENDING, limit)
@@ -74,7 +66,7 @@ def _get_jobs(*args, **kwargs):
     print("\n".join(job_table))
 
 
-@register_command("bulk-approve")
+@register_command("bulk-approve", CLI_SIZE_MAX)
 def _bulk_approve_jobs(*args, **kwargs):
     size_max = int(kwargs.get("size_max", 10))
     job_list: list[Encoding_Job_DTO] = db_manager.get_jobs_by_status_and_size(Job_Status.REVIEW, size_max * (1024**2))
@@ -107,12 +99,7 @@ def _bulk_approve_jobs(*args, **kwargs):
     logger.info(f"Bulk approval results: {complete_count} completed, {error_count} errors")
 
 
-def reset_stopped_working_jobs():
-    upd_count = db_manager.bulk_update_job_status(Job_Status.WORKING, Job_Status.PENDING)
-    return upd_count
-
-
-@register_command("force-approve")
+@register_command("force-approve", CLI_JOB_ID)
 def _force_approve_job(*args, **kwargs):
     if job_id := int(kwargs.get("job_id", 0)):
         db_manager.force_job_status(job_id, Job_Status.COMPLETE)
@@ -147,6 +134,28 @@ def _print_db_stats(*args, **kwargs):
     size_out_list.append(format_size(total_list[3]))
 
     print("\n".join(generate_aligned_table(status_list, count_list, size_in_list, size_out_list)))
+
+
+def reset_stopped_working_jobs():
+    upd_count = db_manager.bulk_update_job_status(Job_Status.WORKING, Job_Status.PENDING)
+    return upd_count
+
+
+def get_actions() -> list[str]:
+    return list(COMMAND_MAP.keys())
+
+
+def dispatch(*args, **kwargs):
+    action = kwargs.pop("action")
+    if method := COMMAND_MAP.get(action):
+        try:
+            logger.info(f"Executing {action}")
+            args_dict = {k: v for k, v in kwargs.items() if v is not None}
+            return method(*args, **args_dict)
+        except Exception as e:
+            logger.error(f"Error executing {action}: {str(e)}", exc_info=True)
+    else:
+        logger.error(f"Undefined action: {action}")
 
 
 def test():

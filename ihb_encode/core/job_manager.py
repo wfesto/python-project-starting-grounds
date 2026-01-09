@@ -2,21 +2,45 @@ import logging
 import os
 import threading
 from pathlib import Path, PurePath
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from ihb_ext import video_manager
 from ihb_utils.gen_utils import generate_aligned_table
 from ihb_utils.video_models import VideoMetrics
 
 from ..conf.config import get_config
-from ..core import db_tools, encoder, user_prompts
+from ..core import encoder, user_prompts
 from ..data import *
-from ..data import db_manager
 
 logger = logging.getLogger(__name__)
 
+CLI_HELP = "Job operations"
+COMMAND_MAP = {}
+FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
-def validate_job(job_list: List[int]) -> List[bool]:
+CLI_INPUT_PATH = CliArgument("i", "input", type=str, help="The input path")
+CLI_OUTPUT_PATH = CliArgument("o", "output", type=str, help="The output directory")
+CLI_ENCODING_PROFILE = CliArgument("e", "encoding_profile", type=str, help="Encoding profile to use")
+CLI_JOB_ID = CliArgument("j", "job_id", type=int, help="Job ID to modify")
+CLI_JOB_LIST = CliArgument("j", "job_list", nargs="*", type=int, help="Job ID list to modify")
+CLI_SKIP_PROMPT = CliArgument("s", "skip_prompt", action="store_true", help="skip displaying the ffmpeg command and prompting to encode.")
+CLI_QUEUE_JOB = CliArgument("q", "queue_job", action="store_true", help="Queue job instead of immediately encoding it.")
+CLI_SIMULATE = CliArgument("t", "simulate", action="store_true", help="Generate ffmpeg commmand but do not enqueue any job (Testing)")
+
+
+def register_command(keyword: str, *cli_args: CliArgument):
+    def decorator(func):
+        COMMAND_MAP[keyword] = func
+        if cli_args:
+            FLAG_MAP[keyword] = cli_args
+        return func
+
+    return decorator
+
+
+@register_command("validate-job")
+def _validate_job(*args, **kwargs) -> list[bool]:
+    job_list = kwargs[CLI_JOB_LIST.name]
     results = [False] * len(job_list)
 
     for idx, job_id in enumerate(job_list):
@@ -35,7 +59,9 @@ def validate_job(job_list: List[int]) -> List[bool]:
     return results
 
 
-def reset_job(job_id: int) -> Encoding_Job_DTO:
+@register_command("reset-job")
+def _reset_job(*args, **kwargs) -> Encoding_Job_DTO:
+    job_id = kwargs[CLI_JOB_ID.name]
     job_dto = db_manager.get_job(job_id)
     if not job_dto:
         logger.error(f"{job_id} not found or is not in error")
@@ -52,58 +78,13 @@ def reset_job(job_id: int) -> Encoding_Job_DTO:
     return job_dto
 
 
-def _generate_job_dto(input_metadata: Dict[str, Any], output_dir: str, profile: EncodingProfile) -> Encoding_Job_DTO:
-    input_file_path = input_metadata["format_data"]["filename"]
+@register_command("process-dir", CLI_INPUT_PATH, CLI_OUTPUT_PATH, CLI_ENCODING_PROFILE)
+def _process_dir(*args, **kwargs) -> int:
+    input_dir = kwargs[CLI_INPUT_PATH.name]
+    output_dir = kwargs[CLI_OUTPUT_PATH.name]
+    profile_s = kwargs[CLI_ENCODING_PROFILE.name]
+    profile = types.get_profile(profile_s)
 
-    if not os.path.isfile(input_file_path):
-        logger.error(f"Invalid input file: {input_file_path}")
-        return False
-    if not os.path.isdir(output_dir):
-        logger.error(f"Invalid output directory: {output_dir}")
-        return False
-
-    adv_opts = Advanced_Options_DTO()
-    if not profile:
-        profile = user_prompts.prompt_encoding_profile(input_metadata, adv_opts)
-
-    if not profile:
-        return None
-
-    encoding_params = Encoding_Job_DTO(
-        job_id=None,
-        input=input_file_path,
-        output=output_dir,
-        profile=profile,
-        adv_params=adv_opts,
-        duration=input_metadata["format_data"]["duration"],
-        size_in=input_metadata["format_data"]["size"],
-    )
-
-    logger.verbose(f"Chosen profile: {profile}")
-    logger.verbose(f"Advanced Options: {adv_opts}")
-
-    return encoding_params
-
-
-def _process_file(
-    input_file_path: str, output_dir: str, profile: EncodingProfile, initial_status: Job_Status, is_simulate: bool = False
-) -> Tuple[Encoding_Job_DTO, Dict[str, Any]]:
-    input_metadata = video_manager.get_video_metadata(input_file_path)
-    if input_metadata["v_count"] == 0:
-        logger.warning(f"{input_file_path} is actually an audio file, skipping")
-        return None, None
-
-    job_dto = _generate_job_dto(input_metadata, output_dir, profile)
-    if job_dto:
-        if not is_simulate:
-            job_dto.status = initial_status
-            db_manager.upsert_job(job_dto)
-        return job_dto, input_metadata
-
-    return None, None
-
-
-def process_dir(input_dir: str, output_dir: str, profile: EncodingProfile) -> int:
     if not os.path.isdir(input_dir):
         logger.error(f"Invalid directory: {input_dir}")
         return 0
@@ -140,9 +121,19 @@ def process_dir(input_dir: str, output_dir: str, profile: EncodingProfile) -> in
     return proc_count
 
 
-def manual_run_file(cmd_line_args: Dict[str, Any]) -> bool:
-    input_path = cmd_line_args["input"]
+@register_command("manual-job", CLI_INPUT_PATH, CLI_OUTPUT_PATH, CLI_ENCODING_PROFILE, CLI_SIMULATE, CLI_QUEUE_JOB, CLI_SKIP_PROMPT)
+def _manual_run_file(*args, **kwargs) -> bool:
+    input_path = kwargs[CLI_INPUT_PATH.name]
     input_file_path = input_path
+    output_path = kwargs[CLI_OUTPUT_PATH.name]
+
+    profile = None
+    if profile_s := kwargs.get(CLI_ENCODING_PROFILE.name, None):
+        profile = types.get_profile(profile_s)
+
+    is_simulate = kwargs[CLI_SIMULATE.name]
+    is_queue = kwargs[CLI_QUEUE_JOB.name]
+    is_skip_prompt = kwargs[CLI_SKIP_PROMPT.name]
 
     if os.path.isdir(input_path):
         existing_jobs = db_manager.get_pending_jobs_by_directory(PurePath(input_path).as_posix())
@@ -159,13 +150,12 @@ def manual_run_file(cmd_line_args: Dict[str, Any]) -> bool:
         logger.error(f"Invalid path: {input_path}")
         return False
 
-    profile = get_profile(cmd_line_args["encoding_profile"]) if "encoding_profile" in cmd_line_args else None
-    job_dto, input_metadata = _process_file(input_file_path, cmd_line_args["output"], profile, Job_Status.IND_JOB, cmd_line_args["simulate"])
+    job_dto, input_metadata = _process_file(input_file_path, output_path, profile, Job_Status.IND_JOB, is_simulate)
 
     if not job_dto or not input_metadata:
         return False
 
-    if cmd_line_args["simulate"]:
+    if is_simulate:
         updated_dto, encode_command = encoder.get_encode_command(job_dto, input_metadata)
         print(" ".join(encode_command))
 
@@ -175,7 +165,7 @@ def manual_run_file(cmd_line_args: Dict[str, Any]) -> bool:
 
         return True
 
-    if cmd_line_args["queue_job"]:
+    if is_queue:
         job_dto.status = Job_Status.PENDING
         db_manager.upsert_job(job_dto)
         logger.info(f"Job queued for {input_path}")
@@ -184,7 +174,7 @@ def manual_run_file(cmd_line_args: Dict[str, Any]) -> bool:
     job_dto.status = Job_Status.WORKING
     db_manager.upsert_job(job_dto)
 
-    job_results_dto, ouptut_metadata = encoder.encode_file(job_dto, input_metadata, cmd_line_args["skip_prompt"])
+    job_results_dto, ouptut_metadata = encoder.encode_file(job_dto, input_metadata, is_skip_prompt)
     if job_results_dto:
         db_manager.upsert_job(job_results_dto)
         if job_results_dto.status == Job_Status.REVIEW:
@@ -197,17 +187,8 @@ def manual_run_file(cmd_line_args: Dict[str, Any]) -> bool:
     return False
 
 
-def _review_job(job_dto: Encoding_Job_DTO, preprocess_results: encoder.JobPreprocessResult = encoder.JobPreprocessResult(None, None, None, None)) -> bool:
-    if not job_dto:
-        return False
-
-    if user_prompts.prompt_review_job(job_dto, **vars(preprocess_results)):
-        db_manager.upsert_job(job_dto)
-        return True
-    return False
-
-
-def review_results():
+@register_command("review-jobs")
+def review_results(*args, **kwargs):
     job_list = db_manager.get_next_job_by_status(Job_Status.REVIEW, limit=999)
     if not job_list:
         print("No jobs available to review.")
@@ -249,26 +230,82 @@ def review_results():
             break
 
 
-def start_jobs(is_stop: bool = False):
-    db_tools.reset_stopped_working_jobs()
+def _process_file(
+    input_file_path: str, output_dir: str, profile: EncodingProfile, initial_status: Job_Status, is_simulate: bool = False
+) -> tuple[Encoding_Job_DTO, dict[str, Any]]:
+    input_metadata = video_manager.get_video_metadata(input_file_path)
+    if input_metadata["v_count"] == 0:
+        logger.warning(f"{input_file_path} is actually an audio file, skipping")
+        return None, None
 
-    while True:
-        job_list = db_manager.get_next_job_by_status(Job_Status.PENDING, limit=1)
-        if job_list:
-            job_dto = job_list[0]
-            job_dto.status = Job_Status.WORKING
+    job_dto = _generate_job_dto(input_metadata, output_dir, profile)
+    if job_dto:
+        if not is_simulate:
+            job_dto.status = initial_status
             db_manager.upsert_job(job_dto)
-            job_results, output_metadata = encoder.encode_file(job_dto, None, is_skip_prompt=True)
-            if job_results:
-                db_manager.upsert_job(job_results)
-        else:
-            logger.info("No jobs pending.")
-            break
+        return job_dto, input_metadata
 
-        if os.path.exists(r".\ihb_encode\db\STOP") or is_stop:
-            logger.info("STOP file detected. Halting.")
-            os.remove(r".\ihb_encode\db\STOP")
-            break
+    return None, None
+
+
+def _review_job(job_dto: Encoding_Job_DTO, preprocess_results: encoder.JobPreprocessResult = encoder.JobPreprocessResult(None, None, None, None)) -> bool:
+    if not job_dto:
+        return False
+
+    if user_prompts.prompt_review_job(job_dto, **vars(preprocess_results)):
+        db_manager.upsert_job(job_dto)
+        return True
+    return False
+
+
+def _generate_job_dto(input_metadata: dict[str, Any], output_dir: str, profile: EncodingProfile) -> Encoding_Job_DTO:
+    input_file_path = input_metadata["format_data"]["filename"]
+
+    if not os.path.isfile(input_file_path):
+        logger.error(f"Invalid input file: {input_file_path}")
+        return False
+    if not os.path.isdir(output_dir):
+        logger.error(f"Invalid output directory: {output_dir}")
+        return False
+
+    adv_opts = Advanced_Options_DTO()
+    if not profile:
+        profile = user_prompts.prompt_encoding_profile(input_metadata, adv_opts)
+
+    if not profile:
+        return None
+
+    encoding_params = Encoding_Job_DTO(
+        job_id=None,
+        input=input_file_path,
+        output=output_dir,
+        profile=profile,
+        adv_params=adv_opts,
+        duration=input_metadata["format_data"]["duration"],
+        size_in=input_metadata["format_data"]["size"],
+    )
+
+    logger.verbose(f"Chosen profile: {profile}")
+    logger.verbose(f"Advanced Options: {adv_opts}")
+
+    return encoding_params
+
+
+def get_actions() -> list[str]:
+    return list(COMMAND_MAP.keys())
+
+
+def dispatch(*args, **kwargs):
+    action = kwargs.pop("action")
+    if method := COMMAND_MAP.get(action):
+        try:
+            logger.info(f"Executing {action}")
+            args_dict = {k: v for k, v in kwargs.items() if v is not None}
+            return method(*args, **args_dict)
+        except Exception as e:
+            logger.error(f"Error executing {action}: {str(e)}", exc_info=True)
+    else:
+        logger.error(f"Undefined action: {action}")
 
 
 def test():
