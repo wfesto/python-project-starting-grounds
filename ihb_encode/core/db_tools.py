@@ -1,5 +1,6 @@
 import logging
 import os
+from collections.abc import Callable
 
 from humanfriendly import format_size
 
@@ -17,7 +18,7 @@ CLI_SIZE_MAX = CliArgument(flag="z", name="size-max", help="Maximum output size 
 
 class DbTools(BaseWorkflowManager):
     CLI_HELP = "Basic DB operations"
-    COMMAND_MAP: dict[str, callable] = {}
+    COMMAND_MAP: dict[str, Callable] = {}
     FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 

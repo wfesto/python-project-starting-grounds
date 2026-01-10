@@ -1,6 +1,7 @@
 import logging
 import os
 import threading
+from collections.abc import Callable
 from pathlib import Path, PurePath
 from typing import Any
 
@@ -27,7 +28,7 @@ CLI_SIMULATE = CliArgument("t", "simulate", action="store_true", help="Generate 
 
 class JobManager(BaseWorkflowManager):
     CLI_HELP = "Job Operations"
-    COMMAND_MAP: dict[str, callable] = {}
+    COMMAND_MAP: dict[str, Callable] = {}
     FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 

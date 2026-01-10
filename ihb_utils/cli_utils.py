@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Any, Protocol
 
@@ -31,7 +32,8 @@ class CliArgument:
 
 
 class WorkflowManager(Protocol):
-    FLAG_MAP: dict[str, tuple[CliArgument, ...]]
+    COMMAND_MAP: dict[str, Callable] = {}
+    FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
     CLI_HELP: str
 
     def get_actions() -> list[str]: ...
@@ -46,6 +48,7 @@ class BaseWorkflowManager:
     @classmethod
     def dispatch(cls, *args, **kwargs) -> Any:
         action = kwargs.pop("action")
+        logger.verbose(kwargs)
         if method := cls.COMMAND_MAP.get(action):
             try:
                 logger.info(f"Executing {action}")
@@ -58,7 +61,7 @@ class BaseWorkflowManager:
 
     @classmethod
     def register_command(cls, keyword: str, *cli_args: CliArgument):
-        def decorator(func: callable):
+        def decorator(func: Callable):
             cls.COMMAND_MAP[keyword] = func
             if cli_args:
                 cls.FLAG_MAP[keyword] = cli_args

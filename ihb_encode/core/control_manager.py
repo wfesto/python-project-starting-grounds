@@ -1,5 +1,6 @@
 import logging
 import os
+from collections.abc import Callable
 
 from ihb_utils.cli_utils import BaseWorkflowManager, CliArgument
 
@@ -16,7 +17,7 @@ STOP_FILE = r".\ihb_encode\db\STOP"
 
 class ControlManager(BaseWorkflowManager):
     CLI_HELP = "Operations to control services"
-    COMMAND_MAP: dict[str, callable] = {}
+    COMMAND_MAP: dict[str, Callable] = {}
     FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 
