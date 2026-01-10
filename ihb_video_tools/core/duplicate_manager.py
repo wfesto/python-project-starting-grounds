@@ -1,24 +1,25 @@
 import logging
 import os
+from collections.abc import Callable
 from enum import StrEnum, auto
-from typing import Any, Dict, List
 
 from humanfriendly import format_size
-from send2trash import send2trash
 
-from ihb_ext.video_manager import (
-    get_psnr_comparison,
-    get_video_metadata,
-    play_video_file,
-)
-from ihb_utils.file_utils import open_explorer_highlight_file
-from ihb_utils.gen_utils import close_exp_window, format_time, generate_aligned_table
-from ihb_utils.video_utils import calc_bppf, get_aspect_ratio_str
-from ihb_video_tools.conf.config import get_config
-from ihb_video_tools.data.db_manager import find_duplicates_by_hash, read_all_records
-from ihb_video_tools.data.dto import File_DTO
+from ihb_ext import video_manager
+from ihb_utils.cli_utils import BaseWorkflowManager, CliArgument
+from ihb_utils.file_utils import get_xxh64_hash, recycle_file
+from ihb_utils.gen_utils import format_time, generate_aligned_table
+
+from ..conf.config import get_config
+from ..data.db_manager import find_duplicates_by_hash, read_all_records
+from ..data.dto import File_DTO
+from . import user_prompts
 
 logger = logging.getLogger(__name__)
+
+
+CLI_INPUT_LIST = CliArgument("i", "input_list", type=str, nargs="*", help="List of input directories")
+CLI_DETECTION_MODE = CliArgument("m", "check_mode", type=str, nargs="*", help="List of detection modes to use")
 
 
 class Duplicate_Mode(StrEnum):
@@ -26,29 +27,45 @@ class Duplicate_Mode(StrEnum):
     DURATION = auto()
 
 
-_PROMPT_COMMANDS = {"v": play_video_file, "e": open_explorer_highlight_file}
-_METHOD_MAP = {}
+class DuplicateManager(BaseWorkflowManager):
+    CLI_HELP = "Duplicate Operations"
+    COMMAND_MAP: dict[str, Callable] = {}
+    FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 
-def register_command(command):
-    def decorator(func):
-        _METHOD_MAP[command] = func
-        return func
+@DuplicateManager.register_command("check-dirs", CLI_INPUT_LIST, CLI_DETECTION_MODE)
+def _process_directories(*args, **kwargs) -> None:
+    dir_list: list[str] = kwargs[CLI_INPUT_LIST.name]
+    mode_list: list[Duplicate_Mode] = [Duplicate_Mode(str.lower(mode)) for mode in kwargs.get(CLI_DETECTION_MODE.name, Duplicate_Mode.HASH.value)]
 
-    return decorator
+    is_hash = Duplicate_Mode.HASH in mode_list
+    is_dur = Duplicate_Mode.DURATION in mode_list
+
+    hash_map: dict[str, list[str]] = {}
+    dur_map: dict[float, list[str]] = {}
+
+    for dir in dir_list:
+        for dir_name, _, file_list in os.walk(dir):
+            logger.info(f"Processing {dir_name}, {len(file_list)} files")
+            for file_name in [file for file in file_list if video_manager.is_video_file(file)]:
+                file_path = os.path.join(dir_name, file_name)
+                if is_hash:
+                    file_hash = get_xxh64_hash(file_path, True)
+                    hash_map.setdefault(file_hash, []).append(file_path)
+                if is_dur:
+                    duration = video_manager.get_video_metadata(file_path)["format_data"]["duration"]
+                    dur_map.setdefault(duration, []).append(file_path)
+
+    if is_hash:
+        for key, value in hash_map.items():
+            if len(value) > 1:
+                if is_quit := not user_prompts.prompt_duplicate_action(value):
+                    return
+
+    if is_dur:
+        pass
 
 
-def handle_duplicates(mode: Duplicate_Mode):
-    _METHOD_MAP[mode]()
-
-
-@register_command(Duplicate_Mode.HASH)
-def process_duplicates_by_hash():
-    dupe_dict = find_duplicates_by_hash()
-    print(len(dupe_dict.keys()))
-
-
-@register_command(Duplicate_Mode.DURATION)
 def process_duplicates_by_duration():
     dto_list = read_all_records(True)
     radius = get_config()["general"]["radius"]
@@ -73,47 +90,21 @@ def process_duplicates_by_duration():
             return
 
 
-def _process_cluster(dto_list: List[File_DTO]):
+def _process_cluster(dto_list: list[File_DTO]):
     while True and len(dto_list) > 1:
         print(_get_prompt_string(dto_list))
         input_val = input("Enter choice:")
 
         if input_val == "q":
             logger.info("[q] - Quitting.")
-            close_all_windows(dto_list)
             return
 
-        elif input_val == "s":
-            logger.info("[s] - Proceeding to next match")
-            close_all_windows(dto_list)
-            break
-
-        elif len(input_val) == 2 and str.isdigit(input_val[1]) and 1 <= int(input_val[1]) <= len(dto_list):
-            list_idx = int(input_val[1]) - 1
-            chosen_file = dto_list[list_idx].path
-
-            if input_val[0] in _PROMPT_COMMANDS.keys():
-                command = _PROMPT_COMMANDS[input_val[0]]
-                command(chosen_file)
-            elif input_val[0] == "d":
-                delete_file(chosen_file)
-            else:
-                logger.warning("Invalid choice.")
         else:
             logger.warning("Invalid choice.")
     return
 
 
-def delete_file(file_path: str):
-    pass
-
-
-def close_all_windows(dto_list: List[File_DTO]):
-    for path in [os.path.normpath(dto.path.replace("/", os.path.sep).replace("\\", os.path.sep)) for dto in dto_list]:
-        close_exp_window(path)
-
-
-def _get_prompt_string(dto_list: List[File_DTO]) -> str:
+def _get_prompt_string(dto_list: list[File_DTO]) -> str:
     prompt_parts = []
 
     duration_list = ["duration"]
