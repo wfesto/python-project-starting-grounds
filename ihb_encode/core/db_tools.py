@@ -1,37 +1,27 @@
 import logging
 import os
-from pathlib import PurePath
 
 from humanfriendly import format_size
-from send2trash import send2trash
 
-from ihb_utils.cli_utils import CliArgument
+from ihb_utils.cli_utils import BaseWorkflowManager, CliArgument
+from ihb_utils.file_utils import recycle_file
 from ihb_utils.gen_utils import generate_aligned_table
 
 from ..data import *
 
 logger = logging.getLogger(__name__)
 
-
-CLI_HELP = "Basic DB operations"
-COMMAND_MAP = {}
-FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
-
 CLI_JOB_ID = CliArgument(flag="j", name="job-id", help="Job ID to modify", type=int)
 CLI_SIZE_MAX = CliArgument(flag="z", name="size-max", help="Maximum output size to bulk approve", type=int)
 
 
-def register_command(keyword: str, *cli_args: CliArgument):
-    def decorator(func):
-        COMMAND_MAP[keyword] = func
-        if cli_args:
-            FLAG_MAP[keyword] = cli_args
-        return func
-
-    return decorator
+class DbTools(BaseWorkflowManager):
+    CLI_HELP = "Basic DB operations"
+    COMMAND_MAP: dict[str, callable] = {}
+    FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 
-@register_command("current-jobs", CLI_SIZE_MAX)
+@DbTools.register_command("current-jobs", CLI_SIZE_MAX)
 def _get_jobs(*args, **kwargs):
     limit = int(kwargs.get("size_max", 1))
     if job_list := db_manager.get_next_job_by_status(Job_Status.WORKING, limit):
@@ -41,7 +31,7 @@ def _get_jobs(*args, **kwargs):
         print("No jobs in progress.")
 
 
-@register_command("reset-job", CLI_JOB_ID)
+@DbTools.register_command("reset-job", CLI_JOB_ID)
 def _get_reset_job(*args, **kwargs):
     job_id = kwargs["job_id"]
     logger.info(f"Resettng {job_id} to status {Job_Status.PENDING.name}")
@@ -49,7 +39,7 @@ def _get_reset_job(*args, **kwargs):
     logger.info(f"Update {job_id} is {"NOT" if is_succcess else ""} successful")
 
 
-@register_command("list-errors", CLI_SIZE_MAX)
+@DbTools.register_command("list-errors", CLI_SIZE_MAX)
 def _get_error_Jobs(*args, **kwargs):
     limit = int(kwargs.get("size_max", 5))
     if job_list := db_manager.get_next_job_by_status(Job_Status.ERROR, limit):
@@ -58,7 +48,7 @@ def _get_error_Jobs(*args, **kwargs):
         print("No errors found")
 
 
-@register_command("list-jobs", CLI_SIZE_MAX)
+@DbTools.register_command("list-jobs", CLI_SIZE_MAX)
 def _get_jobs(*args, **kwargs):
     limit = int(kwargs.get("size_max", 5))
     job_list = db_manager.get_next_job_by_status(Job_Status.PENDING, limit)
@@ -67,7 +57,7 @@ def _get_jobs(*args, **kwargs):
     print("\n".join(job_table))
 
 
-@register_command("bulk-approve", CLI_SIZE_MAX)
+@DbTools.register_command("bulk-approve", CLI_SIZE_MAX)
 def _bulk_approve_jobs(*args, **kwargs):
     size_max = int(kwargs.get("size_max", 10))
     job_list: list[Encoding_Job_DTO] = db_manager.get_jobs_by_status_and_size(Job_Status.REVIEW, size_max * (1024**2))
@@ -83,7 +73,7 @@ def _bulk_approve_jobs(*args, **kwargs):
                 job.notes = {}
             job.notes.setdefault("flow", []).append("Bulk-approved")
             if os.path.exists(job.input):
-                send2trash(PurePath(job.input))
+                recycle_file(job.input)
                 logger.verbose(f"Deleted {job.input}")
             else:
                 logger.verbose(f"Input file {job.input} missing, skipping deletion.")
@@ -100,13 +90,13 @@ def _bulk_approve_jobs(*args, **kwargs):
     logger.info(f"Bulk approval results: {complete_count} completed, {error_count} errors")
 
 
-@register_command("force-approve", CLI_JOB_ID)
+@DbTools.register_command("force-approve", CLI_JOB_ID)
 def _force_approve_job(*args, **kwargs):
     if job_id := int(kwargs.get("job_id", 0)):
         db_manager.force_job_status(job_id, Job_Status.COMPLETE)
 
 
-@register_command("stats")
+@DbTools.register_command("stats")
 def _print_db_stats(*args, **kwargs):
     db_stats = db_manager.select_job_counts()
     status_list = ["STATUS"]
@@ -140,23 +130,6 @@ def _print_db_stats(*args, **kwargs):
 def reset_stopped_working_jobs():
     upd_count = db_manager.bulk_update_job_status(Job_Status.WORKING, Job_Status.PENDING)
     return upd_count
-
-
-def get_actions() -> list[str]:
-    return list(COMMAND_MAP.keys())
-
-
-def dispatch(*args, **kwargs):
-    action = kwargs.pop("action")
-    if method := COMMAND_MAP.get(action):
-        try:
-            logger.info(f"Executing {action}")
-            args_dict = {k: v for k, v in kwargs.items() if v is not None}
-            return method(*args, **args_dict)
-        except Exception as e:
-            logger.error(f"Error executing {action}: {str(e)}", exc_info=True)
-    else:
-        logger.error(f"Undefined action: {action}")
 
 
 def test():

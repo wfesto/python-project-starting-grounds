@@ -5,7 +5,7 @@ from pathlib import Path, PurePath
 from typing import Any
 
 from ihb_ext import video_manager
-from ihb_utils.cli_utils import CliArgument
+from ihb_utils.cli_utils import BaseWorkflowManager, CliArgument
 from ihb_utils.gen_utils import generate_aligned_table
 from ihb_utils.video_models import VideoMetrics
 
@@ -14,10 +14,6 @@ from ..core import encoder, user_prompts
 from ..data import *
 
 logger = logging.getLogger(__name__)
-
-CLI_HELP = "Job operations"
-COMMAND_MAP = {}
-FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 CLI_INPUT_PATH = CliArgument("i", "input", type=str, help="The input path")
 CLI_OUTPUT_PATH = CliArgument("o", "output", type=str, help="The output directory")
@@ -29,17 +25,13 @@ CLI_QUEUE_JOB = CliArgument("q", "queue_job", action="store_true", help="Queue j
 CLI_SIMULATE = CliArgument("t", "simulate", action="store_true", help="Generate ffmpeg commmand but do not enqueue any job (Testing)")
 
 
-def register_command(keyword: str, *cli_args: CliArgument):
-    def decorator(func):
-        COMMAND_MAP[keyword] = func
-        if cli_args:
-            FLAG_MAP[keyword] = cli_args
-        return func
-
-    return decorator
+class JobManager(BaseWorkflowManager):
+    CLI_HELP = "Job Operations"
+    COMMAND_MAP: dict[str, callable] = {}
+    FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 
-@register_command("validate-job")
+@JobManager.register_command("validate-job")
 def _validate_job(*args, **kwargs) -> list[bool]:
     job_list = kwargs[CLI_JOB_LIST.name]
     results = [False] * len(job_list)
@@ -60,7 +52,7 @@ def _validate_job(*args, **kwargs) -> list[bool]:
     return results
 
 
-@register_command("reset-job")
+@JobManager.register_command("reset-job")
 def _reset_job(*args, **kwargs) -> Encoding_Job_DTO:
     job_id = kwargs[CLI_JOB_ID.name]
     job_dto = db_manager.get_job(job_id)
@@ -79,7 +71,7 @@ def _reset_job(*args, **kwargs) -> Encoding_Job_DTO:
     return job_dto
 
 
-@register_command("process-dir", CLI_INPUT_PATH, CLI_OUTPUT_PATH, CLI_ENCODING_PROFILE)
+@JobManager.register_command("process-dir", CLI_INPUT_PATH, CLI_OUTPUT_PATH, CLI_ENCODING_PROFILE)
 def _process_dir(*args, **kwargs) -> int:
     input_dir = kwargs[CLI_INPUT_PATH.name]
     output_dir = kwargs[CLI_OUTPUT_PATH.name]
@@ -122,7 +114,7 @@ def _process_dir(*args, **kwargs) -> int:
     return proc_count
 
 
-@register_command("manual-job", CLI_INPUT_PATH, CLI_OUTPUT_PATH, CLI_ENCODING_PROFILE, CLI_SIMULATE, CLI_QUEUE_JOB, CLI_SKIP_PROMPT)
+@JobManager.register_command("manual-job", CLI_INPUT_PATH, CLI_OUTPUT_PATH, CLI_ENCODING_PROFILE, CLI_SIMULATE, CLI_QUEUE_JOB, CLI_SKIP_PROMPT)
 def _manual_run_file(*args, **kwargs) -> bool:
     input_path = kwargs[CLI_INPUT_PATH.name]
     input_file_path = input_path
@@ -188,7 +180,7 @@ def _manual_run_file(*args, **kwargs) -> bool:
     return False
 
 
-@register_command("review-jobs")
+@JobManager.register_command("review-jobs")
 def review_results(*args, **kwargs):
     job_list = db_manager.get_next_job_by_status(Job_Status.REVIEW, limit=999)
     if not job_list:
@@ -290,23 +282,6 @@ def _generate_job_dto(input_metadata: dict[str, Any], output_dir: str, profile: 
     logger.verbose(f"Advanced Options: {adv_opts}")
 
     return encoding_params
-
-
-def get_actions() -> list[str]:
-    return list(COMMAND_MAP.keys())
-
-
-def dispatch(*args, **kwargs):
-    action = kwargs.pop("action")
-    if method := COMMAND_MAP.get(action):
-        try:
-            logger.info(f"Executing {action}")
-            args_dict = {k: v for k, v in kwargs.items() if v is not None}
-            return method(*args, **args_dict)
-        except Exception as e:
-            logger.error(f"Error executing {action}: {str(e)}", exc_info=True)
-    else:
-        logger.error(f"Undefined action: {action}")
 
 
 def test():

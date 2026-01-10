@@ -2,7 +2,7 @@ import argparse
 import logging
 from typing import Any, Protocol
 
-from ihb_utils.cli_utils import Workflow_Manager
+from ihb_utils.cli_utils import WorkflowManager
 from ihb_utils.gen_utils import configure_logging
 
 from .core import control_manager, db_tools, job_manager
@@ -11,10 +11,10 @@ from .data import verify_db
 logger = logging.getLogger(__name__)
 
 
-MANAGER_MAP: dict[str, Workflow_Manager] = {
-    "db": db_tools,
-    "control": control_manager,
-    "jobs": job_manager,
+MANAGER_MAP: dict[str, WorkflowManager] = {
+    "db": db_tools.DbTools(),
+    "control": control_manager.ControlManager(),
+    "jobs": job_manager.JobManager(),
 }
 
 
