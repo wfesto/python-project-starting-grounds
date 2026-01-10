@@ -5,6 +5,7 @@ from pathlib import Path, PurePath
 from typing import Any
 
 from ihb_ext import video_manager
+from ihb_utils.cli_utils import CliArgument
 from ihb_utils.gen_utils import generate_aligned_table
 from ihb_utils.video_models import VideoMetrics
 

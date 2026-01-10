@@ -2,21 +2,13 @@ import argparse
 import logging
 from typing import Any, Protocol
 
+from ihb_utils.cli_utils import Workflow_Manager
 from ihb_utils.gen_utils import configure_logging
 
 from .core import control_manager, db_tools, job_manager
 from .data import verify_db
-from .data.types import CliArgument
 
 logger = logging.getLogger(__name__)
-
-
-class Workflow_Manager(Protocol):
-    FLAG_MAP: dict[str, tuple[CliArgument, ...]]
-    CLI_HELP: str
-
-    def get_actions() -> list[str]: ...
-    def dispatch(*args: Any, **kwargs: Any) -> None: ...
 
 
 MANAGER_MAP: dict[str, Workflow_Manager] = {

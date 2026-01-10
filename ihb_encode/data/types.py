@@ -12,31 +12,6 @@ from ihb_utils.gen_utils import format_time
 
 
 @dataclass(frozen=True)
-class CliArgument:
-    flag: str
-    name: str
-    help: str = None
-    type: type = None
-    action: str = None
-    nargs: str = None
-
-    def get_args(self) -> tuple[str, str]:
-        return f"-{self.flag}", f"--{self.name}"
-
-    def get_kwargs(self) -> dict[str, Any]:
-        kwargs = {}
-
-        for key, value in asdict(self).items():
-            if value:
-                kwargs[key] = value
-
-        kwargs.pop("flag")
-        kwargs.pop("name")
-
-        return kwargs
-
-
-@dataclass(frozen=True)
 class EncodingProfile:
     name: str
     resolution: str

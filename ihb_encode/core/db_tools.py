@@ -5,6 +5,7 @@ from pathlib import PurePath
 from humanfriendly import format_size
 from send2trash import send2trash
 
+from ihb_utils.cli_utils import CliArgument
 from ihb_utils.gen_utils import generate_aligned_table
 
 from ..data import *

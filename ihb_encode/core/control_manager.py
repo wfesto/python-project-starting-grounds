@@ -1,6 +1,8 @@
 import logging
 import os
 
+from ihb_utils.cli_utils import CliArgument
+
 from ..core import db_tools, encoder
 from ..data import *
 
