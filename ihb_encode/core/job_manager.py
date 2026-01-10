@@ -3,6 +3,7 @@ import os
 import threading
 from collections.abc import Callable
 from pathlib import Path, PurePath
+from queue import PriorityQueue
 from typing import Any
 
 from ihb_ext import video_manager
@@ -183,43 +184,23 @@ def _manual_run_file(*args, **kwargs) -> bool:
 
 @JobManager.register_command("review-jobs")
 def review_results(*args, **kwargs):
-    job_list = db_manager.get_next_job_by_status(Job_Status.REVIEW, limit=999)
-    if not job_list:
+    if not db_manager.get_next_job_by_status(Job_Status.REVIEW, limit=1):
         print("No jobs available to review.")
         return
-    job_count = len(job_list)
-    logger.info(f"{job_count} jobs to review")
-    job_idx = 0
 
-    curr_job_prepx_results = encoder.JobPreprocessResult(None, None, None, None)
+    job_queue = PriorityQueue(maxsize=5)
+    preprocess_thread = threading.Thread(target=encoder.background_process_job, args=(job_queue,), daemon=True)
+    preprocess_thread.start()
 
-    curr_job = job_list.pop(0)
-    next_job = job_list.pop(0) if job_list else None
     while True:
-        job_idx += 1
-        next_job_prepx_results = encoder.JobPreprocessResult(None, None, None, None)
+        neg_job_size, job_id, review_job, preprocess_results = job_queue.get()
+        logger.verbose(f"Next Job: {job_id}, size: {format_size(-1 * neg_job_size)}")
 
-        if next_job:
-            preprocess_thread = threading.Thread(target=encoder.background_process_job, args=(next_job, next_job_prepx_results), daemon=True)
-            preprocess_thread.start()
-        else:
-            preprocess_thread = None
-
-        logger.verbose(f"Next Job: {curr_job.job_id}")
-        logger.info(f"Progress: {job_idx}/{job_count} ({job_count - job_idx} remaining)")
-
-        if not _review_job(curr_job, curr_job_prepx_results):
+        if not _review_job(review_job, preprocess_results):
             print("User terminated review.")
             break
 
-        if preprocess_thread:
-            preprocess_thread.join()
-
-        curr_job = next_job
-        next_job = job_list.pop(0) if job_list else None
-        curr_job_prepx_results = next_job_prepx_results
-
-        if not curr_job:
+        if not preprocess_thread.is_alive():
             print("No jobs available to review.")
             break
 
