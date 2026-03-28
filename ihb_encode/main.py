@@ -1,9 +1,9 @@
 import argparse
 import logging
-from typing import Any, Protocol
+import time
 
-from ihb_utils.cli_utils import WorkflowManager
-from ihb_utils.gen_utils import configure_logging
+from ihb_common.utils.gen_utils import configure_logging, format_time
+from ihb_components.cli.cli_utils import WorkflowManager
 
 from .core import control_manager, db_tools, job_manager
 from .data import verify_db
@@ -37,9 +37,12 @@ def main():
     configure_logging(level=args.level)
     verify_db()
 
-    MANAGER_MAP[args.manager].dispatch(**vars(args))
+    start_time = time.perf_counter()
+    result = MANAGER_MAP[args.manager].dispatch(**vars(args))
+    end_time = time.perf_counter()
+    elapsed_time = end_time - start_time
 
-    return
+    logger.info(f"Executed {args.manager}.{args.action}: {result} in {format_time(elapsed_time)}")
 
 
 if __name__ == "__main__":

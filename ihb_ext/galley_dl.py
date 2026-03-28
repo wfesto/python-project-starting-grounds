@@ -2,9 +2,9 @@ import logging
 import shutil
 import sys
 
-from ihb_utils.file_utils import check_disk_space
-from ihb_utils.gen_utils import (
-    CLI_Output_Mod,
+from ihb_common.utils.file_utils import check_disk_space
+from ihb_common.utils.gen_utils import (
+    VERBOSE_LEVEL_NUM,
     FunctionContainer,
     _run_checked_cli_command,
 )
@@ -44,6 +44,8 @@ def run_gallery_dl(config, url, date_str=None, location=None, filter_string=None
 
     if location:
         cmd.extend(["-d", location])
+
+    logger.log(VERBOSE_LEVEL_NUM, cmd)
 
     space_check = FunctionContainer(check_disk_space, (config["base_dir"], config["minimum_space_init_gb"] * (1024**3)))
 

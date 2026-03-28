@@ -3,7 +3,7 @@ import os
 import sys
 from typing import Any, Dict
 
-from ihb_utils.file_utils import load_config
+from ihb_common.utils.file_utils import load_config
 
 logger = logging.getLogger(__name__)
 _CONFIG_DATA = None

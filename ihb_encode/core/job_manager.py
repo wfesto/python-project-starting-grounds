@@ -6,10 +6,11 @@ from pathlib import Path, PurePath
 from queue import PriorityQueue
 from typing import Any
 
-from ihb_ext import video_manager
-from ihb_utils.cli_utils import BaseWorkflowManager, CliArgument
-from ihb_utils.gen_utils import generate_aligned_table
-from ihb_utils.video_models import VideoMetrics
+from ihb_common.utils.file_utils import recycle_file
+from ihb_common.utils.gen_utils import generate_aligned_table
+from ihb_components.cli.cli_utils import BaseWorkflowManager, CliArgument
+from ihb_video.manager import video_manager
+from ihb_video.types.video_models import VideoMetrics
 
 from ..conf.config import get_config
 from ..core import encoder, user_prompts
@@ -25,6 +26,7 @@ CLI_JOB_LIST = CliArgument("j", "job_list", nargs="*", type=int, help="Job ID li
 CLI_SKIP_PROMPT = CliArgument("s", "skip_prompt", action="store_true", help="skip displaying the ffmpeg command and prompting to encode.")
 CLI_QUEUE_JOB = CliArgument("q", "queue_job", action="store_true", help="Queue job instead of immediately encoding it.")
 CLI_SIMULATE = CliArgument("t", "simulate", action="store_true", help="Generate ffmpeg commmand but do not enqueue any job (Testing)")
+CLI_PREVIEW_MODE = CliArgument("w", "preview_mode", action="store_true", help="Enable preview mode before queuing job")
 
 
 class JobManager(BaseWorkflowManager):
@@ -33,7 +35,7 @@ class JobManager(BaseWorkflowManager):
     FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 
-@JobManager.register_command("validate-job")
+@JobManager.register_command("validate-job", CLI_JOB_LIST)
 def _validate_job(*args, **kwargs) -> list[bool]:
     job_list = kwargs[CLI_JOB_LIST.name]
     results = [False] * len(job_list)
@@ -54,7 +56,7 @@ def _validate_job(*args, **kwargs) -> list[bool]:
     return results
 
 
-@JobManager.register_command("reset-job")
+@JobManager.register_command("reset-job", CLI_JOB_ID)
 def _reset_job(*args, **kwargs) -> Encoding_Job_DTO:
     job_id = kwargs[CLI_JOB_ID.name]
     job_dto = db_manager.get_job(job_id)
@@ -73,11 +75,13 @@ def _reset_job(*args, **kwargs) -> Encoding_Job_DTO:
     return job_dto
 
 
-@JobManager.register_command("process-dir", CLI_INPUT_PATH, CLI_OUTPUT_PATH, CLI_ENCODING_PROFILE)
+@JobManager.register_command("process-dir", CLI_INPUT_PATH, CLI_OUTPUT_PATH, CLI_ENCODING_PROFILE, CLI_PREVIEW_MODE)
 def _process_dir(*args, **kwargs) -> int:
     input_dir = kwargs[CLI_INPUT_PATH.name]
     output_dir = kwargs[CLI_OUTPUT_PATH.name]
     profile_s = kwargs[CLI_ENCODING_PROFILE.name]
+    is_preview_mode = kwargs[CLI_PREVIEW_MODE.name]
+
     profile = types.get_profile(profile_s)
 
     if not os.path.isdir(input_dir):
@@ -93,7 +97,9 @@ def _process_dir(*args, **kwargs) -> int:
         dir_count = len(file_list) - len(existing_files)
         file_idx = 0
         for file_name in sorted(
-            [file for file in file_list if video_manager.is_video_file(file)], key=lambda file: Path(os.path.join(dir_name, file)).stat().st_size, reverse=True
+            [file for file in file_list if video_manager.is_video_file(os.path.join(dir_name, file))],
+            key=lambda file: Path(os.path.join(dir_name, file)).stat().st_size,
+            reverse=True,
         ):
             file_idx += 1
             file_path = os.path.join(dir_name, file_name)
@@ -102,7 +108,7 @@ def _process_dir(*args, **kwargs) -> int:
                 continue
             else:
                 logger.info(f"Job {file_idx} / {dir_count}")
-                job_dto, _ = _process_file(file_path, output_dir, profile, Job_Status.PENDING)
+                job_dto, _ = _process_file(file_path, output_dir, profile=profile, initial_status=Job_Status.PENDING, is_preview=is_preview_mode)
                 if job_dto:
                     logger.info(f"{file_path} processed. Proceeding to next file")
                     proc_count += 1
@@ -145,7 +151,7 @@ def _manual_run_file(*args, **kwargs) -> bool:
         logger.error(f"Invalid path: {input_path}")
         return False
 
-    job_dto, input_metadata = _process_file(input_file_path, output_path, profile, Job_Status.IND_JOB, is_simulate)
+    job_dto, input_metadata = _process_file(input_file_path, output_path, profile=profile, initial_status=Job_Status.IND_JOB, is_simulate=is_simulate)
 
     if not job_dto or not input_metadata:
         return False
@@ -193,25 +199,47 @@ def review_results(*args, **kwargs):
     preprocess_thread.start()
 
     while True:
-        neg_job_size, job_id, review_job, preprocess_results = job_queue.get()
-        logger.verbose(f"Next Job: {job_id}, size: {format_size(-1 * neg_job_size)}")
+        try:
+            if item := job_queue.get(timeout=5):
+                neg_job_size, job_id, review_job, preprocess_results = item
+                logger.verbose(f"Next Job: {job_id}, size: {format_size(-1 * neg_job_size)}")
+            else:
+                logger.info("All jobs reviewed, terminating.")
+                break
 
-        if not _review_job(review_job, preprocess_results):
-            print("User terminated review.")
-            break
+            if not _review_job(review_job, preprocess_results):
+                print("User terminated review.")
+                break
 
-        if not preprocess_thread.is_alive():
-            print("No jobs available to review.")
+        except Exception as e:
+            logger.info(f"Exception in queue processing - {str(e)}", exc_info=True)
             break
 
 
 def _process_file(
-    input_file_path: str, output_dir: str, profile: EncodingProfile, initial_status: Job_Status, is_simulate: bool = False
+    input_file_path: str, output_dir: str, profile: EncodingProfile, initial_status: Job_Status, is_simulate: bool = False, is_preview: bool = False
 ) -> tuple[Encoding_Job_DTO, dict[str, Any]]:
     input_metadata = video_manager.get_video_metadata(input_file_path)
     if input_metadata["v_count"] == 0:
         logger.warning(f"{input_file_path} is actually an audio file, skipping")
         return None, None
+
+    if is_preview:
+        logger.info(f"Playing {input_file_path}")
+        video_manager.play_video_file(input_file_path)
+        while True:
+            print("[q]ueue job")
+            print("[d]elete file")
+            command_str = input("Please select option: ")
+            match command_str:
+                case "q":
+                    break
+                case "d":
+                    logger.info(f"Recycling {input_file_path}")
+                    recycle_file(input_file_path)
+                    return None, None
+                case _:
+                    logger.info(f"Invalid selection: {command_str}. Please select from valid options [q,d].")
 
     job_dto = _generate_job_dto(input_metadata, output_dir, profile)
     if job_dto:

@@ -8,7 +8,7 @@ from typing import Any
 
 from humanfriendly import format_size
 
-from ihb_utils.gen_utils import format_time
+from ihb_common.utils.gen_utils import format_time
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class Profile(Enum):
 PROFILES = {
     Profile.P1080: EncodingProfile("1080p", "1080p", 1080, 1920, 22, "slow", [], False),
     Profile.P720: EncodingProfile("720p", "720p", 720, 1280, 23, "slow", [], False),
-    Profile.P480: EncodingProfile("480p", "480p", 480, 854, 26, "slow", [], False),
+    Profile.P480: EncodingProfile("480p", "480p", 480, 854, 24, "slow", [], False),
     Profile.SOURCE: EncodingProfile("source", "Source Res", 0, 0, 26, "slow", [], True),
 }
 
@@ -106,14 +106,14 @@ class Encoding_Job_DTO:
     @classmethod
     def from_sql_row(cls, row: Row):
         class_fields = {field.name for field in fields(cls)}
-        flitered_fields = {key: value for key, value in dict(row).items() if key in class_fields}
-        job_dto: Encoding_Job_DTO = cls(**flitered_fields)
+        filtered_fields = {key: value for key, value in dict(row).items() if key in class_fields}
+        job_dto: Encoding_Job_DTO = cls(**filtered_fields)
 
-        job_dto.input = PurePath(flitered_fields["input"]).as_posix()
-        job_dto.output = PurePath(flitered_fields["output"]).as_posix() if "output" in flitered_fields else None
+        job_dto.input = PurePath(filtered_fields["input"]).as_posix()
+        job_dto.output = PurePath(filtered_fields["output"]).as_posix() if "output" in filtered_fields else None
 
-        job_dto.profile = get_profile(flitered_fields["profile"])
-        job_dto.status = Job_Status(flitered_fields["status"])
+        job_dto.profile = get_profile(filtered_fields["profile"])
+        job_dto.status = Job_Status(filtered_fields["status"])
 
         if job_dto.notes:
             job_dto.notes = json.loads(job_dto.notes)

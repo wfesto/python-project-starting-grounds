@@ -4,9 +4,9 @@ from collections.abc import Callable
 
 from humanfriendly import format_size
 
-from ihb_utils.cli_utils import BaseWorkflowManager, CliArgument
-from ihb_utils.file_utils import recycle_file
-from ihb_utils.gen_utils import generate_aligned_table
+from ihb_common.utils.file_utils import recycle_file
+from ihb_common.utils.gen_utils import generate_aligned_table
+from ihb_components.cli.cli_utils import BaseWorkflowManager, CliArgument
 
 from ..data import *
 
@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 CLI_JOB_ID = CliArgument(flag="j", name="job-id", help="Job ID to modify", type=int)
 CLI_SIZE_MAX = CliArgument(flag="z", name="size-max", help="Maximum output size to bulk approve", type=int)
+CLI_JOB_STATUS = CliArgument(flag="t", name="job-status", help="Job status", type=int)
 
 
 class DbTools(BaseWorkflowManager):
@@ -126,6 +127,20 @@ def _print_db_stats(*args, **kwargs):
     size_out_list.append(format_size(total_list[3]))
 
     print("\n".join(generate_aligned_table(status_list, count_list, size_in_list, size_out_list)))
+
+
+@DbTools.register_command("job-details", CLI_JOB_ID)
+def _print_job(*args, **kwargs):
+    if job_id := int(kwargs.get("job_id", 0)):
+        job_dto = db_manager.get_job(job_id)
+        print(job_dto)
+
+
+@DbTools.register_command("next-status", CLI_JOB_STATUS)
+def _print_job_by_status(*args, **kwargs):
+    if job_status := int(kwargs.get("job_status", 0)):
+        job_dto = db_manager.get_next_job_by_status(Job_Status(job_status))
+        print(job_dto)
 
 
 def reset_stopped_working_jobs():

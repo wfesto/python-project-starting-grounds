@@ -2,7 +2,7 @@ import logging
 import os
 from collections.abc import Callable
 
-from ihb_utils.cli_utils import BaseWorkflowManager, CliArgument
+from ihb_components.cli.cli_utils import BaseWorkflowManager, CliArgument
 
 from ..core import db_tools, encoder
 from ..data import *
@@ -64,7 +64,7 @@ def _disable_stop_signal(*args, **kwargs):
 @ControlManager.register_command("check-stop")
 def _check_stop_signal(*args, **kwargs) -> bool:
     is_stop_enabled = os.path.exists(STOP_FILE)
-    logger.verbose(f"STOP signal enabled: {is_stop_enabled}")
+    logger.info(f"STOP signal enabled: {is_stop_enabled}")
     return is_stop_enabled
 
 

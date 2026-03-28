@@ -3,12 +3,12 @@ import os
 from pathlib import PurePath
 from typing import Any
 
-from ihb_ext import video_manager
-from ihb_utils import video_utils
-from ihb_utils.color_codes import TerminalColorCodes
-from ihb_utils.file_utils import open_explorer_highlight_file, recycle_file
-from ihb_utils.gen_utils import generate_aligned_table
-from ihb_utils.video_models import Validation_Results_DTO, VideoMetrics
+from ihb_common.types.color_codes import TerminalColorCodes
+from ihb_common.utils.file_utils import open_explorer_highlight_file, recycle_file
+from ihb_common.utils.gen_utils import generate_aligned_table
+from ihb_video.manager import video_manager
+from ihb_video.types.video_models import ValidationResultDTO, VideoMetrics
+from ihb_video.utils import video_utils
 
 from ..data.types import *
 
@@ -156,7 +156,7 @@ def prompt_review_job(
         logger.info(f" -> {row}")
 
     if validation_list := job_dto.notes.get("validation", None):
-        validation_results = [Validation_Results_DTO(**validation) for validation in validation_list]
+        validation_results = [ValidationResultDTO(**validation) for validation in validation_list]
         print("-" * 20)
         for result in validation_results:
             color_code = TerminalColorCodes.BRIGHT_GREEN if result.result else TerminalColorCodes.BRIGHT_RED

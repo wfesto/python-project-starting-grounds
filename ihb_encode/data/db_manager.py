@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import sqlite3
-from typing import List
 
 from ..conf.config import get_config
 from ..scripts import insert, schema, seed_data, select, update
@@ -20,7 +19,7 @@ def get_job(job_id: int) -> Encoding_Job_DTO:
         return job_dto
 
 
-def get_pending_jobs_by_directory(input_dir: str, status: Job_Status = Job_Status.PENDING) -> List[Encoding_Job_DTO]:
+def get_pending_jobs_by_directory(input_dir: str, status: Job_Status = Job_Status.PENDING) -> list[Encoding_Job_DTO]:
     with sqlite3.connect(get_config()["db_conn"]) as db:
         cursor = db.cursor()
         cursor.row_factory = sqlite3.Row
@@ -29,7 +28,7 @@ def get_pending_jobs_by_directory(input_dir: str, status: Job_Status = Job_Statu
         return job_list
 
 
-def get_jobs_by_status_and_size(status: Job_Status, max_size: int) -> List[Encoding_Job_DTO]:
+def get_jobs_by_status_and_size(status: Job_Status, max_size: int) -> list[Encoding_Job_DTO]:
     with sqlite3.connect(get_config()["db_conn"]) as db:
         cursor = db.cursor()
         cursor.row_factory = sqlite3.Row
@@ -72,7 +71,7 @@ def select_job_counts():
         return status_counts
 
 
-def get_next_job_by_status(status: Job_Status, limit: int = 1) -> List[Encoding_Job_DTO]:
+def get_next_job_by_status(status: Job_Status, limit: int = 1) -> list[Encoding_Job_DTO]:
     with sqlite3.connect(get_config()["db_conn"]) as db:
         cursor = db.cursor()
         cursor.row_factory = sqlite3.Row
