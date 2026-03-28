@@ -1,8 +1,8 @@
 import logging
 from collections.abc import Callable
 
-from ihb_ext.video_manager import play_video_file
-from ihb_utils.file_utils import recycle_file
+from ihb_common.utils.file_utils import recycle_file
+from ihb_video.manager.video_manager import play_video_file
 
 logger = logging.getLogger(__name__)
 

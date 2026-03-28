@@ -4,27 +4,23 @@ import queue
 import sqlite3
 import threading
 import time
-from typing import Any, Dict, List
+from collections.abc import Callable
+from pathlib import PurePath
+from typing import Any
 
-from ihb_video_tools.conf.config import get_config
-from ihb_video_tools.data.dto import File_DTO
-from ihb_video_tools.scripts import data, schema
+from ihb_components.cli.cli_utils import BaseWorkflowManager, CliArgument
+
+from ..conf.config import get_config
+from ..data.dto import File_DTO
+from ..scripts import data, schema
 
 logger = logging.getLogger(__name__)
 
-COMMAND_MAP = {}
 
-
-def get_actions() -> List[str]:
-    return list(COMMAND_MAP.keys())
-
-
-def execute_action(action: str, *args, **kwargs):
-    if method := COMMAND_MAP.get(action, None):
-        logger.info(f"Executing {action}")
-        method(*args, **kwargs)
-    else:
-        logger.error(f"Undefined action: {action}")
+class DbManager(BaseWorkflowManager):
+    CLI_HELP = "Duplicate Operations"
+    COMMAND_MAP: dict[str, Callable] = {}
+    FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 
 def db_writer(record_queue: queue.Queue, stop_event: threading.Event):
@@ -35,7 +31,7 @@ def db_writer(record_queue: queue.Queue, stop_event: threading.Event):
 
     while not (stop_event.is_set() and record_queue.empty()):
         try:
-            dto = record_queue.get(timeout=0.1)
+            dto: File_DTO = record_queue.get(timeout=0.1)
             record_cache.append(dto.to_db_params())
             record_queue.task_done()
 
@@ -50,7 +46,7 @@ def db_writer(record_queue: queue.Queue, stop_event: threading.Event):
     _write_records(record_cache)
 
 
-def _write_records(record_list: List[Dict[str, Any]]):
+def _write_records(record_list: list[dict[str, Any]]):
     if not record_list:
         logger.debug("write_records called with no records")
         return
@@ -117,23 +113,30 @@ def find_duplicate_pairs_by_duration():
         print(len(records))
 
 
-def read_all_records(is_min_duration: bool = False):
+def read_all_records(target_dir: str = "", is_min_duration: bool = False):
     db_file = get_config()["db"]["conn"]
-    query_param = {"min_duration": (get_config()["general"]["min_duration"] if is_min_duration else 0)}
-
     if not os.path.isfile(db_file):
         logger.warning("No db found")
         return
 
+    query_param = {"min_duration": (get_config()["general"]["min_duration"] if is_min_duration else 0)}
+    sql_list = [data.select_records_file_data_all]
+    if target_dir:
+        sql_list.append(data.where_by_directory)
+        query_param["path"] = PurePath(target_dir).as_posix()
+    sql_list.append(data.order_by_duration_desc)
+
+    sql_str = " ".join(sql_list)
+
     with sqlite3.connect(db_file) as db:
         cursor = db.cursor()
         cursor.row_factory = sqlite3.Row
-        cursor.execute(f"{data.select_records_file_data_all} {data.order_by_duration_desc}", query_param)
+        cursor.execute(sql_str, query_param)
         dto_list = [File_DTO.from_db_record(record) for record in cursor]
         return dto_list
 
 
-def delete_records(path_list: List[str]):
+def delete_records(path_list: list[str]):
     param_list = []
     for path in path_list:
         param_list.append({"path": path})
@@ -152,40 +155,32 @@ def create_db():
         db.commit()
 
 
-def register_command(command):
-    def decorator(func):
-        COMMAND_MAP[command] = func
-        return func
-
-    return decorator
-
-
-@register_command("drop")
-def drop_db():
+@DbManager.register_command("drop")
+def drop_db(*args, **kwargs):
     db_file = get_config()["db"]["conn"]
     if os.path.isfile(db_file):
         os.remove(db_file)
 
 
-@register_command("output")
-def output_db():
+@DbManager.register_command("output")
+def output_db(*args, **kwargs):
     print_records(is_include_metadata=False)
 
 
-@register_command("output-json")
-def output_db_with_records():
+@DbManager.register_command("output-json")
+def output_db_with_records(*args, **kwargs):
     print_records(is_include_metadata=True)
 
 
-@register_command("verify")
-def verify_db():
+@DbManager.register_command("verify")
+def verify_db(*args, **kwargs):
     db_file = get_config()["db"]["conn"]
     if not os.path.isfile(db_file):
         create_db()
 
 
-@register_command("update")
-def update_db():
+@DbManager.register_command("update")
+def update_db(*args, **kwargs):
     with sqlite3.connect(get_config()["db"]["conn"]) as db:
         cursor = db.cursor()
         for script in schema.UPDATE_SCRIPTS:
@@ -193,15 +188,15 @@ def update_db():
         db.commit()
 
 
-@register_command("ghosts")
-def delete_ghost_records():
+@DbManager.register_command("ghosts")
+def delete_ghost_records(*args, **kwargs):
     dto_list = read_all_records()
     path_list = [dto.path for dto in dto_list if not os.path.isfile(dto.path)]
     delete_records(path_list)
 
 
-@register_command("count")
-def count_ghost_records():
+@DbManager.register_command("count")
+def count_ghost_records(*args, **kwargs):
     with sqlite3.connect(get_config()["db"]["conn"]) as db:
         cursor = db.cursor()
         cursor.execute(data.select_count_records_file_data)

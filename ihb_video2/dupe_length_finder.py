@@ -9,15 +9,15 @@ from humanfriendly import format_size
 from send2trash import send2trash
 from win32gui import EnumWindows, GetWindowText, IsWindowVisible, PostMessage
 
-from ihb_ext.video_manager import (
+from ihb_common.utils.dir_utils import choose_directory
+from ihb_common.utils.file_utils import open_explorer_highlight_file
+from ihb_common.utils.gen_utils import configure_logging, format_time
+from ihb_video.manager.video_manager import (
     get_psnr_comparison,
     get_video_metadata,
     play_video_file,
 )
-from ihb_utils.dir_utils import choose_directory
-from ihb_utils.file_utils import open_explorer_highlight_file
-from ihb_utils.gen_utils import configure_logging, format_time
-from ihb_utils.video_utils import (
+from ihb_video.utils.video_utils import (
     VIDEO_EXTENSIONS,
     PSNR_Comparison,
     calc_bppf,

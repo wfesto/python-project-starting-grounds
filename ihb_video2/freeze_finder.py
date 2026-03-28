@@ -2,10 +2,10 @@ import argparse
 import logging
 import os
 
-from ihb_ext.video_manager import get_video_timecode_data
-from ihb_utils.dir_utils import choose_directory, get_file_list
-from ihb_utils.gen_utils import configure_logging
-from ihb_utils.video_utils import Frame_Time_Data
+from ihb_common.utils.dir_utils import choose_directory, get_file_list
+from ihb_common.utils.gen_utils import configure_logging
+from ihb_video.manager.video_manager import get_video_timecode_data
+from ihb_video.utils.video_utils import Frame_Time_Data
 
 logger = logging.getLogger(__name__)
 

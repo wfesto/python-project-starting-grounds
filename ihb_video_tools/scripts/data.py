@@ -24,6 +24,10 @@ select_records_file_data_all = """
     select * from file_data where duration >= :min_duration
 """
 
+where_by_directory = """
+    and path like :path || '%'
+"""
+
 order_by_duration_desc = """
     order by duration desc
 """

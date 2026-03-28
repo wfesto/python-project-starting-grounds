@@ -5,21 +5,28 @@ from enum import StrEnum, auto
 
 from humanfriendly import format_size
 
-from ihb_ext import video_manager
-from ihb_utils.cli_utils import BaseWorkflowManager, CliArgument
-from ihb_utils.file_utils import get_xxh64_hash, recycle_file
-from ihb_utils.gen_utils import format_time, generate_aligned_table
-
-from ..conf.config import get_config
-from ..data.db_manager import find_duplicates_by_hash, read_all_records
-from ..data.dto import File_DTO
-from . import user_prompts
+from ihb_common.utils.file_utils import get_xxh64_hash
+from ihb_common.utils.gen_utils import (
+    VERBOSE_LEVEL_NUM,
+    format_time,
+    generate_aligned_table,
+)
+from ihb_components.cli.cli_utils import *
+from ihb_components.tui import tui
+from ihb_components.tui.types import *
+from ihb_video.manager import video_manager
+from ihb_video_tools.conf.config import get_config
+from ihb_video_tools.core import user_prompts
+from ihb_video_tools.core.db_manager import find_duplicates_by_hash, read_all_records
+from ihb_video_tools.data.dto import File_DTO
 
 logger = logging.getLogger(__name__)
 
 
 CLI_INPUT_LIST = CliArgument("i", "input_list", type=str, nargs="*", help="List of input directories")
 CLI_DETECTION_MODE = CliArgument("m", "check_mode", type=str, nargs="*", help="List of detection modes to use")
+
+IGNORE = MenuChoiceDTO("[i]gnore duplicates permanently", "i")
 
 
 class Duplicate_Mode(StrEnum):
@@ -31,6 +38,21 @@ class DuplicateManager(BaseWorkflowManager):
     CLI_HELP = "Duplicate Operations"
     COMMAND_MAP: dict[str, Callable] = {}
     FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
+
+
+def _convert_file_dto_to_file_menu_choice_DTO(file_dto: File_DTO) -> FileMenuDataDTO:
+    dto_data = {
+        "file_name": file_dto.path,
+        "file_path": file_dto.path,
+        "file_data": [
+            format_time(file_dto.duration / 1000),
+            format_size(int(file_dto.size)),
+            f"{eval(file_dto.metadata.get("frame_rate", "0")):.2f}",
+            file_dto.metadata["resolution"],
+        ],
+        #        "file_extra": None,
+    }
+    return FileMenuDataDTO(**dto_data)
 
 
 @DuplicateManager.register_command("check-dirs", CLI_INPUT_LIST, CLI_DETECTION_MODE)
@@ -66,42 +88,57 @@ def _process_directories(*args, **kwargs) -> None:
         pass
 
 
-def process_duplicates_by_duration():
-    dto_list = read_all_records(True)
+@DuplicateManager.register_command("full-duration")
+def process_duplicates_by_duration(*args, **kwargs):
+    dto_list: list[File_DTO] = read_all_records(is_min_duration=True)
     radius = get_config()["general"]["radius"]
 
-    cluster = []
+    cluster: list[File_DTO] = []
     dto_count = len(dto_list)
 
     for idx, dto in enumerate(dto_list):
         cluster.clear()
-        cluster.append(dto)
+        if not os.path.exists(dto.path):
+            continue
 
-        seed_duration = dto.duration
-        min_duration = seed_duration - radius
+        cluster.append(dto)
+        logger.log(VERBOSE_LEVEL_NUM, f"Cluster started wtih {dto.path}")
+        min_duration = dto.duration - radius
 
         dur_idx = idx + 1
         while dur_idx < dto_count and dto_list[dur_idx].duration >= min_duration:
-            cluster.append(dto_list[dur_idx])
+            next_dto = dto_list[dur_idx]
             dur_idx += 1
+            if not os.path.exists(next_dto.path):
+                continue
 
-        if len(cluster) > 1:
-            _process_cluster(cluster)
-            return
+            cluster.append(next_dto)
+            logger.log(VERBOSE_LEVEL_NUM, f"{next_dto.path} appended to cluster")
 
+        if len(cluster) <= 1:
+            continue
 
-def _process_cluster(dto_list: list[File_DTO]):
-    while True and len(dto_list) > 1:
-        print(_get_prompt_string(dto_list))
-        input_val = input("Enter choice:")
+        command = tui.show_multi_file_options(
+            header_info=[],
+            file_data_headers=["duration", "size", "fps", "resolution"],
+            file_list=[_convert_file_dto_to_file_menu_choice_DTO(dto) for dto in cluster],
+            file_actions=[PLAY_VIDEO_FILE, DELETE_FILE],
+            menu_actions=[IGNORE, SKIP, QUIT],
+            # rotate_file_data=True,
+        )
 
-        if input_val == "q":
-            logger.info("[q] - Quitting.")
-            return
+        logger.info(f"{command}")
 
-        else:
-            logger.warning("Invalid choice.")
-    return
+        match command:
+            case QUIT.command:
+                logger.info("Exiting application")
+                return
+            case SKIP.command:
+                logger.info("Skipping cluster temporarily")
+                continue
+            case IGNORE.command:
+                # call db_manager to ignore this cluster
+                continue
 
 
 def _get_prompt_string(dto_list: list[File_DTO]) -> str:

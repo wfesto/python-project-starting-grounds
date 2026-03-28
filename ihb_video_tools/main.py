@@ -2,17 +2,19 @@ import argparse
 import logging
 import time
 
-import ihb_video_tools.core.processor as directory_processor
-from ihb_utils.cli_utils import WorkflowManager
-from ihb_utils.gen_utils import configure_logging, format_time
+import ihb_video_tools.core.file_processor as directory_processor
+from ihb_common.utils.gen_utils import configure_logging, format_time
+from ihb_components.cli.cli_utils import WorkflowManager
 
-from .core import duplicate_manager
+from .core import db_manager, duplicate_manager, file_processor
 
 logger = logging.getLogger(__name__)
 
 
 MANAGER_MAP: dict[str, WorkflowManager] = {
     "duplicates": duplicate_manager.DuplicateManager(),
+    "process": file_processor.FileProcessor(),
+    "db": db_manager.DbManager(),
 }
 
 

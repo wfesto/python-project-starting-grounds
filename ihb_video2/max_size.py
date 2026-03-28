@@ -7,8 +7,8 @@ from typing import List
 
 from humanfriendly import format_size
 
-from ihb_utils.dir_utils import choose_directory
-from ihb_utils.gen_utils import configure_logging
+from ihb_common.utils.dir_utils import choose_directory
+from ihb_common.utils.gen_utils import configure_logging
 
 logger = logging.getLogger(__name__)
 
