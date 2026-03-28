@@ -2,11 +2,11 @@ import logging
 import os
 import shutil
 import sys
-import tempfile
-from typing import Any, Dict, List
+from typing import Any
 
-from ihb_utils.gen_utils import _run_simple_cli_command
-from ihb_utils.video_utils import _build_chapter_file
+from ihb_common.utils.gen_utils import _run_simple_cli_command
+from ihb_video.types.stream_models import StreamType
+from ihb_video.utils.video_utils import _build_chapter_file
 
 logger = logging.getLogger("__name__")
 
@@ -53,16 +53,17 @@ def _embed_subtitles(file_path: str, sub_path: str, sub_title: str = "English (F
     return output_file
 
 
-def _update_default_subtitles(file_path: str, probe_data: Dict[str, Any], selected_index: int, is_default: bool) -> bool:
-    logger.info(f" -> Updating default subtitle stream {selected_index} to default={is_default} in {file_path}")
-    offset = _get_stream_index_offset(probe_data, selected_index, "subtitle")
+def _update_default_stream(file_path: str, probe_data: dict[str, Any], selected_index: int, is_default: bool, stream_type: StreamType) -> bool:
+    logger.info(f" -> Updating default {stream_type.name} stream {selected_index} to default={is_default} in {file_path}")
+    offset = _get_stream_index_offset(probe_data, selected_index, stream_type.name.lower())
     logger.debug(f" -> mkvtools offset calculated: {offset}")
     cmd_idx = selected_index - offset + 1
+    stream_type_flag = stream_type.name[0].lower()
     command = [
         MKV_PROPEDIT_BINARY,
         file_path,
         "--edit",
-        f"track:s{cmd_idx}",
+        f"track:{stream_type_flag}{cmd_idx}",
         "--set",
         f"flag-default={int(is_default)}",
     ]
@@ -75,12 +76,12 @@ def _update_default_subtitles(file_path: str, probe_data: Dict[str, Any], select
     return True
 
 
-def _get_stream_index_offset(probe_data: Dict[str, Any], selected_index: int, stream_type: str) -> int:
+def _get_stream_index_offset(probe_data: dict[str, Any], selected_index: int, stream_type: str) -> int:
     offset = sum(1 for stream in probe_data["full_data"]["streams"] if stream["index"] < selected_index and stream["codec_type"] != stream_type)
     return offset
 
 
-def _set_chapters(file_path, probe_data_list: List, auto_chapter: bool) -> bool:
+def _set_chapters(file_path, probe_data_list: list, auto_chapter: bool) -> bool:
     if not os.path.exists(file_path) or not probe_data_list:
         logger.warning(" -> No chapter data provided. No update performed")
         return

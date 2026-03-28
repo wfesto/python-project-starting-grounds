@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-from ihb_utils.gen_utils import configure_logging
+from ihb_common.utils.gen_utils import configure_logging
 
 logger = logging.getLogger(__name__)
 

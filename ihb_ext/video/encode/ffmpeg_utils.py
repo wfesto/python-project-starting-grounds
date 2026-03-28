@@ -2,11 +2,17 @@ import os
 import re
 from typing import Any, Dict
 
-from ihb_encode.data import *
-from ihb_utils.gen_utils import format_time
-from ihb_utils.video_utils import EncodingProfile
+from humanfriendly import format_size
 
-FFMPEG_UPDATE_STR_REGEX = re.compile(r"(.*time=)(\d+:\d+:\d+\.\d+)(\s+.*elapsed=)(\d+:\d+:\d+\.\d+)")
+from ihb_common.utils.gen_utils import format_time
+from ihb_encode.data import *
+from ihb_video.utils.video_utils import EncodingProfile
+
+FFMPEG_UPDATE_STR_REGEX = re.compile(r"(.*size=)\s*(\d*)(\w*)\s(.*time=)(\d+:\d+:\d+\.\d+)(\s+.*elapsed=)(\d+:\d+:\d+\.\d+)")
+UPDATE_STR_SIZE_DIGIT_IDX = 2
+UPDATE_STR_SIZE_DIGIT_UNIT = 3
+UPDATE_STR_TIME_IDX = 5
+UPDATE_STR_TIME_ELAPS_IDX = 7
 FFMPEG_BINARY = "ffmpeg"
 INDETERMINATE_VALUES = ["unknown", "unspecified", "default"]
 LEGACY_COLOR_CODES = {
@@ -114,21 +120,36 @@ def calc_seconds(input_str: str) -> float:
 
 def insert_time_progression(input_str: str, duration: float) -> str:
     input_match = FFMPEG_UPDATE_STR_REGEX.search(input_str)
-    duration_progress = calc_seconds(input_match.group(2))
-    perc = duration_progress / duration
-
-    curr_time = calc_seconds(input_match.group(4))
+    duration_progress = calc_seconds(input_match.group(UPDATE_STR_TIME_IDX))
+    dur_perc = duration_progress / duration
+    curr_time = calc_seconds(input_match.group(UPDATE_STR_TIME_ELAPS_IDX))
 
     proj_time_str = "N/A"
-    if curr_time and perc:
-        proj_time = curr_time / perc
+    proj_size_str = "N/A"
+    if curr_time and dur_perc:
+        proj_time = curr_time / dur_perc
         proj_time_str = format_time(proj_time, True, True)
+
+        proj_size = cal_raw_bytes(input_match.group(UPDATE_STR_SIZE_DIGIT_IDX), input_match.group(UPDATE_STR_SIZE_DIGIT_UNIT)) / dur_perc
+        proj_size_str = format_size(round(proj_size, 4))
 
         rem_time = proj_time - curr_time
         rem_time_str = format_time(rem_time, True, True)
 
-        reconstructed_string = f"{input_match.group(1)}{input_match.group(2)}{input_match.group(3)}{input_match.group(4)} proj={proj_time_str} rem={rem_time_str} ({(100 * perc):.2f}%)"
-        return reconstructed_string
+        reconstructed_string = (
+            f"{input_match.group(1)}",
+            f"{input_match.group(2)}",
+            f"{input_match.group(3)}",
+            f"proj={proj_size_str}",
+            f"{input_match.group(4)}",
+            f"{input_match.group(5)}",
+            f"{input_match.group(6)}",
+            f"{input_match.group(7)}",
+            f"proj={proj_time_str}",
+            f"rem={rem_time_str}",
+            f"({(100 * dur_perc):.2f}%)",
+        )
+        return " ".join(reconstructed_string)
 
     return input_str
 
@@ -147,3 +168,13 @@ def get_target_framerate(probe_data: Dict[str, Any]) -> float:
             fps = frames / duration
 
     return fps
+
+
+def cal_raw_bytes(amount: int, unit: str) -> int:
+    match unit:
+        case "KiB":
+            multiplier = 1000
+        case _:
+            multiplier = 1
+    raw_bytes = int(amount) * multiplier
+    return raw_bytes

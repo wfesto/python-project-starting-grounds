@@ -4,7 +4,7 @@ import shutil
 import sys
 from typing import List
 
-from ihb_utils.gen_utils import _run_simple_cli_command
+from ihb_common.utils.gen_utils import _run_simple_cli_command
 
 logger = logging.getLogger(__name__)
 EXT_7Z = "7z"

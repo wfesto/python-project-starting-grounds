@@ -1,4 +1,5 @@
 import logging
+import mmap
 import os
 import shutil
 import time
@@ -19,11 +20,11 @@ from win32gui import (
     SetForegroundWindow,
 )
 
-from ihb_utils.gen_utils import _run_simple_cli_command
+from ihb_common.utils.gen_utils import _run_simple_cli_command
 
-logger = logging.getLogger("__name__")
+logger = logging.getLogger(__name__)
 EXPLORER_EXE = "explorer"
-HASHER = xxhash.xxh64()
+HASHER = xxhash.xxh3_64()
 
 
 def recycle_file(file_path: str, do_check_dir=False) -> bool:
@@ -43,29 +44,39 @@ def recycle_file(file_path: str, do_check_dir=False) -> bool:
         return True
 
     except Exception as e:
-        logger.verbose(f"Error recycling {file_path} - {e}")
+        logger.error(f"Error recycling {file_path} - {e}")
         return False
 
 
-def get_xxh64_hash(file_path, is_use_partial: bool = False, block_size_mb: int = 5) -> str | None:
+def get_xxh64_hash(file_path, is_use_partial: bool = False, block_size_mb: int = 1) -> str | None:
     logger.debug(f"Calculating xx64 hash for {file_path}")
     hasher = HASHER.copy()
+
     block_size = block_size_mb * 1024**2
     file_size = os.stat(file_path).st_size
 
     try:
         with open(file_path, "rb") as f:
-            if is_use_partial and (2 * block_size) <= file_size:
-                hasher.update(f.read(block_size))
-                f.seek(file_size - block_size, 0)
-                hasher.update(f.read(block_size))
+            if is_use_partial and (3 * block_size) <= file_size:
+                buffer = bytearray(block_size)
+                mv = memoryview(buffer)
+
+                n = f.readinto(mv)
+                hasher.update(mv[:n])
+
+                f.seek(file_size // 2)
+                n = f.readinto(mv)
+                hasher.update(mv[:n])
+
+                f.seek(file_size - block_size)
+                n = f.readinto(mv)
+                hasher.update(mv[:n])
 
             else:
-                while chunk := f.read(4096):
-                    hasher.update(chunk)
-
+                with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                    hasher.update(mm)
             hash = hasher.hexdigest()
-            logger.debug(f"Hash calculated: {hash}")
+            logger.verbose(f"Hash calculated: {hash}")
             return hash
     except Exception as e:
         logger.error(f"Unable to calculate xx64 hash: {e}")
@@ -146,19 +157,17 @@ def choose_directory() -> str | None:
 
 def load_config(file_name: str = "config.yaml", file_path: str = None) -> Dict[str, Any] | None:
     """Loads and returns the configuration from the yaml file."""
-    final_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_name)
-    if file_path:
-        final_path = os.path.join(file_path, file_name)
-    logger.debug(f"Loading config file: {final_path}")
+    final_path = os.path.join((file_path if file_path else os.path.dirname(os.path.abspath(__file__))), file_name)
+    logger.verbose(f"Loading config file: {final_path}")
     try:
         with open(final_path, "r") as f:
             config = yaml.safe_load(f)
-            logger.debug(f"Config loaded: {config}")
+            logger.verbose(f"Config loaded: {config}")
             return config
     except FileNotFoundError:
-        logger.critical(f"Configuration file not found at {file_path} / {file_name}.")
+        logger.error(f"Configuration file not found at {final_path}")
     except Exception as e:
-        logger.critical(f"Error loading {final_path}: {e}")
+        logger.error(f"Error loading {file_path}/{file_name}: {e}")
 
 
 def check_disk_space(path: str, threshold: float) -> bool:

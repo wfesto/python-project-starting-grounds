@@ -1,18 +1,17 @@
 import argparse
 import logging
 import os
-import re
 import shutil
 from pathlib import Path
 from typing import Dict, List
 
 from humanfriendly import format_size
 
-from ihb_ext.video_manager import get_video_metadata
+from ihb_video.manager.video_manager import get_video_metadata
 
+from ...ihb_video.utils.video_utils import remove_res_from_file_name
 from .file_utils import choose_directory
 from .gen_utils import configure_logging, generate_aligned_table
-from .video_utils import remove_res_from_file_name
 
 logger = logging.getLogger(__name__)
 

@@ -8,10 +8,7 @@ import subprocess
 import threading
 import time
 import traceback
-from pathlib import Path
-from typing import Any, List
-
-from win32gui import EnumWindows, GetWindowText, IsWindowVisible, PostMessage
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +76,10 @@ def format_time(seconds_s: str | float | int, is_include_all_fields: bool = Fals
     elif m > 0:
         return f"{m}m {s}s"
     else:
-        return f"{s}s"
+        return f"{s+1}s"
 
 
-def _run_interruptable_cli_command(command: List, polling_gap: int = 2) -> subprocess.CompletedProcess | None:
+def _run_interruptable_cli_command(command: list, polling_gap: int = 2) -> subprocess.CompletedProcess | None:
     logger.debug(f"Executing {command}")
 
     interrupt_queue = queue.Queue(maxsize=1)
@@ -124,7 +121,7 @@ def _run_interruptable_cli_command(command: List, polling_gap: int = 2) -> subpr
     return None
 
 
-def _run_simple_cli_command(command: List) -> subprocess.CompletedProcess | None:
+def _run_simple_cli_command(command: list) -> subprocess.CompletedProcess | None:
     logger.debug(f"Executing {command}")
     try:
         start_time = time.perf_counter()
@@ -151,7 +148,7 @@ def _run_simple_cli_command(command: List) -> subprocess.CompletedProcess | None
     return None
 
 
-def _run_checked_cli_command(command: List, check_function: FunctionContainer = None, update_config: CLI_Output_Mod = None) -> int:
+def _run_checked_cli_command(command: list, check_function: FunctionContainer = None, update_config: CLI_Output_Mod = None) -> int:
     logger.debug(f"Executing {command}")
     try:
         start_time = time.perf_counter()
@@ -197,7 +194,7 @@ def _run_checked_cli_command(command: List, check_function: FunctionContainer = 
         elapsed_time = end_time - start_time
         logger.info(f"{command[0]} finished, code {return_code} in {format_time(elapsed_time)}")
 
-        return return_code
+        return return_code == 0
 
     except subprocess.CalledProcessError as e:
         logger.error(f"Error processing {command}: {e}")
@@ -208,25 +205,14 @@ def _run_checked_cli_command(command: List, check_function: FunctionContainer = 
     return 1
 
 
-def close_exp_window(file_name):
-    folder_name = str(Path(file_name).parent)[0:95]
+def generate_aligned_table(*columns: list[list[Any]], delimiter: str = "|", spacing: int = 1, rotate=False) -> list[str]:
+    if len(columns) == 0 or len(columns[0]) == 0:
+        return []
 
-    def enum_handler(hwnd, ctx):
-        if IsWindowVisible and folder_name == GetWindowText(hwnd):
-            PostMessage(hwnd, 0x0010, 0, 0)
-            time.sleep(0.01)
-            return False
-
-        return True
-
-    EnumWindows(enum_handler, None)
-
-
-def generate_aligned_table(*columns: List[List[Any]], delimiter: str = "|", spacing: int = 1, rotate=False) -> List[str]:
     if rotate:
         columns = [list(row[::-1]) for row in zip(*columns)]
 
-    max_length: List[int] = [max([len(str(col_val)) for col_val in column]) for column in columns]
+    max_length: list[int] = [max([len(str(col_val)) for col_val in column]) for column in columns]
     splitter = f"{' ' * spacing}{delimiter}{' ' * spacing}"
 
     lines = []

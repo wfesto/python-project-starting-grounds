@@ -1,12 +1,12 @@
 import logging
 import os
 import shutil
-import subprocess
 import sys
 from typing import Any, Dict, List
 
-from ihb_utils.gen_utils import _run_simple_cli_command
-from ihb_utils.video_utils import _build_chapter_file
+from ihb_common.utils.gen_utils import _run_simple_cli_command
+from ihb_video.types.stream_models import StreamType
+from ihb_video.utils.video_utils import _build_chapter_file
 
 logger = logging.getLogger("__name__")
 MP4BOX_BINARY = "mp4box"
@@ -42,9 +42,12 @@ def _embed_subtitles(file_path: str, sub_path: str, sub_title: str = "English Su
     return output_file
 
 
-def _update_default_subtitles(file_path: str, probe_data: Dict[str, Any], selected_index: int, is_default: bool) -> bool:
+def _update_default_stream(file_path: str, probe_data: Dict[str, Any], selected_index: int, is_default: bool, stream_type: StreamType) -> bool:
+    logger.info(f" -> Updating default {stream_type.name} stream {selected_index} to default={is_default} in {file_path}")
     update_command = "enable" if is_default else "disable"
-    ffprobe_stream = next(stream for stream in probe_data["s_streams"] if stream["index"] == selected_index)
+
+    stream_prefix = stream_type.name.lower()[0]
+    ffprobe_stream = next(stream for stream in probe_data[f"{stream_prefix}_streams"] if stream["index"] == selected_index)
 
     calc_stream_idx = selected_index + 1
 
@@ -73,13 +76,13 @@ def _set_chapters(file_path, probe_data_list: List, auto_chapter: bool) -> bool:
         return
     logger.info("Building chapter file.")
 
-    chapter_file = _build_chapter_file(probe_data_list)
+    chapter_file = _build_chapter_file(file_path, probe_data_list)
 
     if not auto_chapter:
         logger.info(f"Chapter file created at {chapter_file}. Press enter once it is correct.")
         input()
 
-    logger.info(f" -> Updating {file_path} chapters with {len(chapter_file)} chapters")
+    logger.info(f" -> Updating {file_path} chapters with {len(probe_data_list)} chapters")
     command = [
         MP4BOX_BINARY,
         "-chap",

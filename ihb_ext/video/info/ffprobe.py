@@ -5,8 +5,8 @@ import shutil
 import sys
 from typing import Any, Dict, List
 
-from ihb_utils.gen_utils import _run_simple_cli_command
-from ihb_utils.video_models import FrameTimeData
+from ihb_common.utils.gen_utils import _run_simple_cli_command
+from ihb_video.types.video_models import FrameTimeData
 
 logger = logging.getLogger("__name__")
 FFPROBE_BINARY = "ffprobe"

@@ -6,21 +6,26 @@ import shutil
 import sys
 import time
 from dataclasses import replace
-from typing import Any, Dict, List, NamedTuple, Tuple
+from subprocess import CompletedProcess
+from typing import Any, NamedTuple
 
-import ihb_ext.ffmpeg_utils as ffmpeg_utils
-from ihb_encode.data import *
-from ihb_utils.file_utils import check_disk_space
-from ihb_utils.gen_utils import (
+import ihb_ext.video.encode.ffmpeg_utils as ffmpeg_utils
+from ihb_common.utils.file_utils import check_disk_space
+from ihb_common.utils.gen_utils import (
     CLI_Output_Mod,
     _run_checked_cli_command,
     _run_interruptable_cli_command,
+    _run_simple_cli_command,
 )
-from ihb_utils.video_models import PSNR_COMP_REGEX, PsnrComparison
-from ihb_utils.video_utils import calc_target_resolution, remove_res_from_file_name
+from ihb_encode.data import *
+from ihb_video.types.video_models import PSNR_COMP_REGEX, PsnrComparison
+from ihb_video.utils.video_utils import (
+    calc_target_resolution,
+    remove_res_from_file_name,
+)
 
-from .ffmpeg_validator import _run_validation
-from .ffprobe import _get_video_metadata
+from ..info.ffprobe import _get_video_metadata
+from .ffmpeg_validator import VALIDATION_TYPE, ValidationResultDTO, _run_validation
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +42,7 @@ if not shutil.which(FFMPEG_BINARY):
 class CommandBuildResult(NamedTuple):
     """Structured result for the FFmpeg command build process."""
 
-    command_list: List[str]
+    command_list: list[str]
     output_path: str
     target_width: int
     target_height: int
@@ -71,21 +76,21 @@ def _build_run_psnr_comparison(input_file_1: str, input_file_2: str) -> PsnrComp
     return None
 
 
-def _build_run_simple_concat_command(input_files_data: List, output_dir: str, auto_exec: bool = False) -> str | None:
-    output_dir_name = os.path.basename(output_dir)
-    temp_file_path = os.path.join(output_dir, f"concat_list_{output_dir_name}.txt")
-    output_file_name = f"{output_dir_name}{os.path.splitext(input_files_data[0]["file_name"])[1]}"
+def _build_run_simple_concat_command(input_dir: str, output_dir: str, file_data_list: list, auto_exec: bool = False) -> tuple[bool, str, ValidationResultDTO]:
+    input_dir_base = os.path.basename(input_dir)
+    temp_file_path = os.path.join(output_dir, f"concat_list_{input_dir_base}.txt")
+    output_file_name = f"{input_dir_base}{os.path.splitext(file_data_list[0]["file_name"])[1]}"
     output_path = os.path.join(output_dir, output_file_name)
 
-    output_size = sum(size for size in input_files_data["format"]["size"])
-    if not check_disk_space(output_path, output_size):
+    output_size = sum(int(data["format_data"]["size"]) for data in file_data_list)
+    if not check_disk_space(output_dir, output_size):
         logger.error(f"Insufficient disk space for {output_path}")
         return None
 
     try:
         with open(temp_file_path, "w") as f:
-            for probe_data in input_files_data:
-                absolute_path = probe_data["format"]["filename"].replace("\\", "/")
+            for probe_data in file_data_list:
+                absolute_path = probe_data["format_data"]["filename"].replace("\\", "/")
                 f.write(f"file '{absolute_path}'\n")
     except IOError as e:
         logger.error(f"Failed to create temporary concat file at {temp_file_path}. Error: {e}")
@@ -94,8 +99,8 @@ def _build_run_simple_concat_command(input_files_data: List, output_dir: str, au
     ffmpeg_command = [FFMPEG_BINARY, "-f", "concat", "-safe", "0", "-i", temp_file_path, "-c", "copy", output_path]
 
     logger.info("Concatenation Order (Alphabetical, using absolute paths):")
-    for probe_data in input_files_data:
-        logger.info(f"  - {probe_data['format']['filename']}")
+    for probe_data in file_data_list:
+        logger.info(f"  - {probe_data['format_data']['filename']}")
 
     logger.info(f"\nFFmpeg Command :\n{' '.join(ffmpeg_command)}\n")
 
@@ -108,17 +113,18 @@ def _build_run_simple_concat_command(input_files_data: List, output_dir: str, au
 
     is_success = _run_checked_cli_command(ffmpeg_command, None, None)
     os.remove(temp_file_path)
-    return output_path if is_success else None
+    validation = _run_validation(None, _get_video_metadata(output_path), VALIDATION_TYPE.ANALYSIS)
+    return is_success, output_path, validation
 
 
-def _get_output_file_name(encode_params: Encoding_Job_DTO, config: Dict[str, Any]) -> str:
+def _get_output_file_name(encode_params: Encoding_Job_DTO, config: dict[str, Any]) -> str:
     base_name = os.path.basename(encode_params.input)
     output_file_name = remove_res_from_file_name(base_name, encode_params.profile.name.lower(), config["general"]["extension"])
     output_file_path = os.path.join(encode_params.output, output_file_name)
     return output_file_path
 
 
-def _generate_encode_command(encode_params: Encoding_Job_DTO, file_metadata: Dict[str, Any], config: Dict[str, Any]) -> Tuple[Encoding_Job_DTO, List]:
+def _generate_encode_command(encode_params: Encoding_Job_DTO, file_metadata: dict[str, Any], config: dict[str, Any]) -> tuple[Encoding_Job_DTO, list]:
     file_metadata = file_metadata or _get_video_metadata(encode_params.input)
 
     v_stream = file_metadata["v_streams"][0]
@@ -178,8 +184,8 @@ def _generate_encode_command(encode_params: Encoding_Job_DTO, file_metadata: Dic
 
 
 def _encode_video(
-    encode_params: Encoding_Job_DTO, file_metadata: Dict[str, Any], config: Dict[str, Any], is_skip_prompt: bool = False
-) -> Tuple[Encoding_Job_DTO, Dict[str, Any]]:
+    encode_params: Encoding_Job_DTO, file_metadata: dict[str, Any], config: dict[str, Any], is_skip_prompt: bool = False
+) -> tuple[Encoding_Job_DTO, dict[str, Any]]:
     file_metadata = file_metadata or _get_video_metadata(encode_params.input)
     result_params, command = _generate_encode_command(encode_params, file_metadata, config)
 
@@ -190,7 +196,6 @@ def _encode_video(
     logger.info(f" -> Output: {output_file_path}")
     logger.info(f" -> Profile: {encode_params.profile.name.upper()} (CRF {encode_params.profile.crf}, Preset '{encode_params.profile.encoder_preset}')")
 
-    # print_command(command, is_fix_pts)
     print_command(command)
 
     prompt = "Do you want to EXECUTE this FFmpeg command now? (y/n): "
@@ -211,6 +216,7 @@ def _encode_video(
         new_probe_data = _get_video_metadata(output_file_path)
 
         result_params.size_out = new_probe_data["format_data"]["size"]
+        result_params.notes = {}
         result_params.notes["command"] = " ".join(command)
         result_params.notes["encode_time"] = f"{elapsed_time}"
 
@@ -223,7 +229,7 @@ def _encode_video(
         return None, None
 
 
-def _rerun_encoding_validation(job_dto: Encoding_Job_DTO, config: Dict[str, Any]) -> bool:
+def _rerun_encoding_validation(job_dto: Encoding_Job_DTO, config: dict[str, Any]) -> bool:
     try:
         input_metadata = _get_video_metadata(job_dto.input)
         if os.path.isdir(job_dto.output):
@@ -244,7 +250,7 @@ def _rerun_encoding_validation(job_dto: Encoding_Job_DTO, config: Dict[str, Any]
         return False
 
 
-def _validate_encoding_job(job_dto: Encoding_Job_DTO, input_metadata: Dict[str, Any], output_metadata: Dict[str, Any]):
+def _validate_encoding_job(job_dto: Encoding_Job_DTO, input_metadata: dict[str, Any], output_metadata: dict[str, Any]):
     input_metadata = input_metadata or _get_video_metadata(job_dto.input)
     output_metadata = output_metadata or _get_video_metadata(job_dto.output)
 
@@ -254,9 +260,15 @@ def _validate_encoding_job(job_dto: Encoding_Job_DTO, input_metadata: Dict[str, 
     job_dto.notes["validation"] = validaton_result_dict
 
 
-def print_command(command: Dict[str, Any]):
+def _run_stream_integrity_analysis(input_file: str) -> CompletedProcess:
+    command = ["ffmpeg", "-v", "error", "-i", input_file, "-f", "null", "-", "-xerror"]
+    result = _run_simple_cli_command(command)
+    return result
+
+
+def print_command(command: dict[str, Any]):
     quoted_command = command.copy()
-    input_idx = 2
+    input_idx = 3
     output_idx = -1
     #    input_idx = 2 + (2 if is_fix_pts else 0)
     quoted_command[input_idx] = f'"{command[input_idx]}"'
