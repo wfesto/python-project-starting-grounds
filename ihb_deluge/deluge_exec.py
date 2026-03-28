@@ -10,9 +10,10 @@ if root_dir not in sys.path:
     sys.path.append(root_dir)
 
 
-from ihb_utils.file_utils import load_config
-from ihb_utils.gen_utils import format_time
-from ihb_video.cc_default_setter import process_directory, process_file
+from ihb_common.utils.file_utils import load_config
+from ihb_common.utils.gen_utils import format_time
+from ihb_video.tools import default_stream_setter
+from ihb_video.types.stream_models import StreamType
 
 logger = logging.getLogger(__name__)
 
@@ -41,26 +42,17 @@ def main():
         logger.info(f"Skipping {torrent_name} because it matches {name_match}")
         return 0
 
-    potential_file_path = os.path.join(torrent_dir, torrent_name)
+    torrent_path = os.path.join(torrent_dir, torrent_name)
+    logger.info(f"Resolved: {torrent_path}")
 
     start_time = time.perf_counter()
-    if os.path.exists(potential_file_path):
-        if os.path.isfile(potential_file_path):
-            logger.info(f" -> Single file: {potential_file_path}")
-            process_file(potential_file_path)
-
-        elif os.path.isdir(potential_file_path):
-            logger.info(f" -> Directory: {potential_file_path}")
-            process_directory(potential_file_path, proc_subs=True)
-
-        else:
-            logger.warning(f"Unable to process {potential_file_path}")
-
+    if os.path.exists(torrent_path):
+        default_stream_setter.process_path(torrent_path, StreamType.SUBTITLE, StreamType.AUDIO)
     else:
-        logger.info("Skipping - Probably a deleted torrent.")
+        logger.info(f"Skipping {torrent_path} - Probably a deleted torrent.")
     end_time = time.perf_counter()
     elapsed_time = end_time - start_time
-    logger.info(f"Processing took {format_time(elapsed_time)}")
+    logger.info(f"Processing {torrent_id} @ {torrent_path} took {format_time(elapsed_time)}")
 
 
 if __name__ == "__main__":
