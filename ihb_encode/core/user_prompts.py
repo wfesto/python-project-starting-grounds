@@ -167,6 +167,7 @@ def prompt_review_job(
     print(f"[v]x || Play Video file x in [V]LC")
     print(f"[e]x || Show Video file in [E]xplorer")
     print(f"[d]x || [D]elete Video file")
+    print(f"[c]ompare videos")
     print(f"[a]pprove job")
     print(f"[x] Delete both files and mark job deleted")
     print(f"[r]eset job")
@@ -176,6 +177,9 @@ def prompt_review_job(
         while True:
             user_choice = list(input("Enter selection and option: ").lower())
             logger.verbose(f"Choice: {user_choice}")
+
+            if not user_choice:
+                user_choice = [" "]
 
             while user_choice:
                 is_update = False
@@ -201,6 +205,9 @@ def prompt_review_job(
                     recycle_file(input_file)
                     recycle_file(output_file)
                     job_dto.status = Job_Status.DELETED
+
+                elif command == "c":
+                    video_manager.play_videos_together(input_file, output_file)
 
                 elif command in PROMPT_COMMANDS.keys():
                     file_choice = None

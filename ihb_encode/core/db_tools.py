@@ -41,6 +41,15 @@ def _get_reset_job(*args, **kwargs):
     logger.info(f"Update {job_id} is {"NOT" if is_succcess else ""} successful")
 
 
+@DbTools.register_command("cancel-job", CLI_JOB_ID)
+def _cancel_Job(*args, **kwargs):
+    job_id = kwargs["job_id"]
+    logger.info(f"Cancelling {job_id}")
+    job_dto = db_manager.get_job(job_id)
+    job_dto.status = Job_Status.CANCELLED
+    db_manager.upsert_job(job_dto)
+
+
 @DbTools.register_command("list-errors", CLI_SIZE_MAX)
 def _get_error_Jobs(*args, **kwargs):
     limit = int(kwargs.get("size_max", 5))

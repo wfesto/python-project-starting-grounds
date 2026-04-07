@@ -10,7 +10,7 @@ import yaml
 from ihb_common.utils.gen_utils import _run_simple_cli_command
 from ihb_encode.data import *
 from ihb_ext.video.encode import ffmpeg
-from ihb_ext.video.info import ffprobe, pymediainfo
+from ihb_ext.video.info import ffplay, ffprobe, pymediainfo
 from ihb_video.types.stream_models import StreamType
 from ihb_video.types.video_data import VideoDataDTO
 from ihb_video.types.video_models import (
@@ -45,10 +45,20 @@ def _validate_config():
             print()
 
 
-def play_video_file(file_path: str) -> None:
+def play_video_file(file_path: str, vol_level: int = 50) -> None:
     logger.verbose(f"Playing {file_path}")
-    command = [VLC_BINARY, PurePath(file_path), "--gain", ".25"]
+    command = [VLC_BINARY, PurePath(file_path), "--gain", ".25", "--play-and-exit", "--no-video-title-show", "--fullscreen"]
     _run_simple_cli_command(command)
+
+
+#    result = ffplay.play_video(file_path, vol_level)
+#   logger.verbose(f"Return code {result}")
+
+
+def play_videos_together(video_path_1: str, video_path_2: str, vol_level: int = 25) -> None:
+    logger.verbose(f"Playing {video_path_1} | {video_path_2}")
+    result = ffplay.play_videos_comparison(video_path_1, video_path_2, vol_level)
+    logger.verbose(f"Return code {result}")
 
 
 def get_py_video_metadata(file_path: str) -> dict[str, Any]:

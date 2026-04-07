@@ -35,6 +35,18 @@ class JobManager(BaseWorkflowManager):
     FLAG_MAP: dict[str, tuple[CliArgument, ...]] = {}
 
 
+@JobManager.register_command("sim-job", CLI_JOB_ID)
+def _simulate_job(*args, **kwargs) -> None:
+
+    if job_id := kwargs.get(CLI_JOB_ID, None):
+        job_dto = db_manager.get_job(job_id)
+    else:
+        job_dto = db_manager.get_next_job_by_status(Job_Status.PENDING)[0]
+
+    cmd_dto, command = video_manager.generate_encode_command(job_dto, None, get_config())
+    print(" ".join(command))
+
+
 @JobManager.register_command("validate-job", CLI_JOB_LIST)
 def _validate_job(*args, **kwargs) -> list[bool]:
     job_list = kwargs[CLI_JOB_LIST.name]
@@ -200,7 +212,7 @@ def review_results(*args, **kwargs):
 
     while True:
         try:
-            if item := job_queue.get(timeout=5):
+            if item := job_queue.get(timeout=30):
                 neg_job_size, job_id, review_job, preprocess_results = item
                 logger.verbose(f"Next Job: {job_id}, size: {format_size(-1 * neg_job_size)}")
             else:
