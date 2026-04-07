@@ -132,7 +132,7 @@ def process_directory(input_dir: str, *stream_type: StreamType) -> int:
             else:
                 logger.log(VERBOSE_LEVEL_NUM, f" -> Skipping {file_name}, unsupported file type")
 
-    logger.info(f"--- Audio Default Processing Complete for {input_dir}. Total files updated: {processed_count} ---")
+    logger.info(f"--- {stream_type} Default Processing Complete for {input_dir}. Total files updated: {processed_count} ---")
     return processed_count
 
 
@@ -164,7 +164,7 @@ def main():
         logger.error("No valid input path provided. Exiting.")
         return 1
 
-    processed_files = process_path(args.input)
+    processed_files = process_path(args.input, StreamType.AUDIO, StreamType.SUBTITLE)
     if processed_files < 0:
         logger.error("Error encountered during processing.")
     else:

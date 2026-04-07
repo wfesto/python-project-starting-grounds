@@ -18,7 +18,9 @@ if not shutil.which(MP4BOX_BINARY):
     sys.exit(1)
 
 
-def _embed_subtitles(file_path: str, sub_path: str, sub_title: str = "English Subtitles", sub_lang: str = "eng", is_default: bool = True):
+def _embed_subtitles(
+    file_path: str, sub_path: str, sub_title: str = "English Subtitles", sub_lang: str = "eng", is_default: bool = True, interleave_ms: int = 500
+):
     file_parts = os.path.splitext(file_path)
     output_file = file_parts[0] + "_subbed" + file_parts[1]
 
@@ -28,6 +30,9 @@ def _embed_subtitles(file_path: str, sub_path: str, sub_title: str = "English Su
         file_path,
         "-add",
         f"{sub_path}:lang={sub_lang}:txtflags={FLAG_FORCED_DEFAULT}",
+        "-inter",
+        str(interleave_ms),
+        "-flat",
         "-new",
         output_file,
     ]
