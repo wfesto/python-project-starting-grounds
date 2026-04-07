@@ -35,11 +35,11 @@ def main():
 
     check_dir = torrent_dir.replace("\\", "/")
     if found_dir := next((dir for dir in config["skip_dirs"] if str.lower(dir) in check_dir.lower()), None):
-        logger.info(f"Skipping {torrent_dir} because it matches {found_dir}")
+        logger.info(f"Skipping {torrent_dir} because it matches directory {found_dir}")
         return 0
 
     if name_match := next((name for name in config["skip_names"] if re.search(str.lower(name), torrent_name.lower())), None):
-        logger.info(f"Skipping {torrent_name} because it matches {name_match}")
+        logger.info(f"Skipping {torrent_name} because it matches file {name_match}")
         return 0
 
     torrent_path = os.path.join(torrent_dir, torrent_name)

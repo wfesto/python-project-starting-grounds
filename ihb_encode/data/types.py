@@ -58,6 +58,7 @@ class Job_Status(IntEnum):
     ERROR = auto()
     MAN_APPR = auto()
     DELETED = auto()
+    CANCELLED = auto()
     UNKNOWN = 99
 
     def to_sql_params(self, language: str) -> dict[str, Any]:
@@ -82,7 +83,7 @@ class Encoding_Job_DTO:
     adv_params: Advanced_Options_DTO = None
 
     def to_pretty_string(self):
-        return f"{format_time(self.duration)} \t\t {format_size(self.size_in)}\t{self.profile.name}\t{os.path.basename(self.input)}"
+        return f"{format_time(self.duration)} \t {format_size(self.size_in)}\t{self.profile.name}\t{self.job_id}\t{os.path.basename(self.input)}"
 
     def to_sql_params(self):
         db_params = asdict(self)
