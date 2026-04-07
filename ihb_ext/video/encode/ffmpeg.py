@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 import shlex
 import shutil
 import sys
@@ -119,7 +118,7 @@ def _build_run_simple_concat_command(input_dir: str, output_dir: str, file_data_
 
 def _get_output_file_name(encode_params: Encoding_Job_DTO, config: dict[str, Any]) -> str:
     base_name = os.path.basename(encode_params.input)
-    output_file_name = remove_res_from_file_name(base_name, encode_params.profile.name.lower(), config["general"]["extension"])
+    output_file_name = remove_res_from_file_name(base_name, encode_params.profile.name.lower(), config["encode"]["extension"])
     output_file_path = os.path.join(encode_params.output, output_file_name)
     return output_file_path
 
@@ -161,7 +160,7 @@ def _generate_encode_command(encode_params: Encoding_Job_DTO, file_metadata: dic
         tar_fps = ffmpeg_utils.get_target_framerate(file_metadata)
     is_fix_pts = (not is_good_pts) and tar_fps > 0
 
-    command_params = ffmpeg_utils.populate_encode_params(file_metadata, encode_params.profile, encode_params.adv_params)
+    command_params = ffmpeg_utils.populate_encode_params(file_metadata, encode_params.profile, encode_params.adv_params, config=config["encode"])
 
     command_params["TARGET_RES"] = f"{target_resolution}"
     command_params["DAR_FRACTION"] = f"{calc_resolution.width}/{calc_resolution.height}"

@@ -8,6 +8,7 @@ from ihb_common.utils.gen_utils import format_time
 from ihb_encode.data.types import PROFILES, EncodingProfile
 from ihb_ext.video.encode.ffmpeg_validator import ValidationResultDTO
 from ihb_ext.video.info.ffprobe import _get_stream_size
+from ihb_video.types.stream_models import StreamType
 
 from ..types.video_models import Resolution
 
@@ -54,18 +55,18 @@ def calc_bppf(probe_data: dict[str, Any]) -> float:
     return bppf
 
 
-def calc_bitrate(probe_data: dict[str, Any]) -> float:
+def calc_bitrate(probe_data: dict[str, Any], stream_type: StreamType) -> float:
     format_data = probe_data["format_data"]
-    v_data = probe_data["v_streams"][0]
+    stream_data = probe_data[f"{stream_type.get_stream_key()}_streams"][0]
 
-    if bitrate := float(v_data.get("bitrate", 0)):
+    if bitrate := float(stream_data.get("bitrate", 0)):
         return bitrate
 
-    stream_size = int(v_data.get("size", 0))
+    stream_size = int(stream_data.get("size", 0))
     if not stream_size:
-        stream_size = _get_stream_size(format_data["filename"], "video", 0)
+        stream_size = _get_stream_size(format_data["filename"], stream_type, 0)
     stream_size_bytes = stream_size * 8
-    duration = float(v_data.get("duration", format_data.get("duration")))
+    duration = float(stream_data.get("duration", format_data.get("duration")))
     bitrate = stream_size_bytes / duration
     return bitrate
 
@@ -76,19 +77,23 @@ def calc_target_resolution(
 
     while True:
         if enc_profile.fixed_dim == 0 or enc_profile.is_source:
-            final_target_width = source_width
-            final_target_height = source_height
+            target_width = source_width
+            target_height = source_height
         else:
             if source_width >= source_height:  # Landscape
-                final_target_width = sars_mult * enc_profile.fixed_dim * (source_width / source_height)
-                final_target_height = enc_profile.fixed_dim
+                target_width = sars_mult * enc_profile.fixed_dim * (source_width / source_height)
+                target_height = enc_profile.fixed_dim
             else:  # Portrait
-                final_target_height = sars_mult * enc_profile.fixed_dim * (source_height / source_width)
-                final_target_width = enc_profile.fixed_dim
+                target_height = sars_mult * enc_profile.fixed_dim * (source_height / source_width)
+                target_width = enc_profile.fixed_dim
 
-        if force_even:
-            final_target_width = int(round(final_target_width / 2.0) * 2)
-            final_target_height = int(round(final_target_height / 2.0) * 2)
+        if enc_profile.is_source:
+            final_target_width = int(round(target_width / 2.0) * 2)
+            final_target_height = int(round(target_height / 2.0) * 2)
+
+        elif force_even:
+            final_target_width = int(round(target_width / 16.0) * 16)
+            final_target_height = int(round(target_height / 16.0) * 16)
 
         if force_profile or (final_target_height <= source_height and final_target_width <= source_width):
             return Resolution(width=final_target_width, height=final_target_height), enc_profile
@@ -146,7 +151,7 @@ def format_bitrate(bitrate: float) -> str:
     sign = "-" if bitrate < 0 else ""
     prefixes = ["", "K", "M", "G", "T"]
     bitrate = abs(bitrate)
-    prefix_idx = min(int(log10(bitrate) // 3), len(prefixes) - 1)
+    prefix_idx = min(int((log10(bitrate) + 1e-9) // 3), len(prefixes) - 1)
 
     scaled = bitrate / (1000**prefix_idx)
     return f"{sign}{scaled:.2f}".rstrip("0").rstrip(".") + f" {prefixes[prefix_idx]}bps"

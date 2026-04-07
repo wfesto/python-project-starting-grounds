@@ -6,6 +6,7 @@ import sys
 from typing import Any, Dict, List
 
 from ihb_common.utils.gen_utils import _run_simple_cli_command
+from ihb_video.types.stream_models import StreamType
 from ihb_video.types.video_models import FrameTimeData
 
 logger = logging.getLogger("__name__")
@@ -17,17 +18,17 @@ if not shutil.which(FFPROBE_BINARY):
     sys.exit(1)
 
 
-def _get_stream_size(file_name: str, stream_type: str, stream_index: int) -> int:
+def _get_stream_size(file_name: str, stream_type: StreamType, stream_index: int) -> int:
     command = [
         FFPROBE_BINARY,
         "-v",
         "error",
         "-select_streams",
-        f"{stream_type[0]}:{stream_index}",
+        f"{stream_type.get_stream_key()}:{stream_index}",
         "-show_entries",
         "packet=size",
         "-of",
-        "compact=p=0:nk=1",
+        "default=noprint_wrappers=1:nk=1",
         file_name,
     ]
 

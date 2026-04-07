@@ -6,6 +6,7 @@ from typing import Any
 from humanfriendly import format_size
 
 from ihb_common.utils.gen_utils import format_time
+from ihb_video.types.stream_models import StreamType
 
 PSNR_COMP_REGEX = re.compile(r"PSNR y:(.*?)\s+u:(.*?)\s+v:(.*?)\s+average:(.*?)\s+min:(.*?)\s+max:(.*)")
 FLOAT_REGEX = re.compile(r"^\d*\.?\d+$")
@@ -104,7 +105,8 @@ class VideoMetrics:
         "Size",
         "Resolution",
         "BPPF",
-        "Bitrate",
+        "V_Bitrate",
+        "A_Bitrate",
     ]
 
     name: str
@@ -115,7 +117,8 @@ class VideoMetrics:
     size: int
     resolution: Resolution
     bppf: float
-    bitrate: float
+    v_bitrate: float
+    a_bitrate: float
 
     @classmethod
     def from_ffprobe_data(cls, probe_data: dict[str, Any], profile, is_set_bitrate: bool) -> VideoMetrics:
@@ -141,7 +144,8 @@ class VideoMetrics:
         data["resolution"] = Resolution(video_data["width"], video_data["height"])
         data["bppf"] = calc_bppf(probe_data)
 
-        data["bitrate"] = calc_bitrate(probe_data) if is_set_bitrate else -1
+        data["v_bitrate"] = calc_bitrate(probe_data, StreamType.VIDEO) if is_set_bitrate else -1
+        data["a_bitrate"] = calc_bitrate(probe_data, StreamType.AUDIO) if is_set_bitrate and audio_data else -1
 
         video_metrics = cls(**data)
         return video_metrics
@@ -160,7 +164,8 @@ class VideoMetrics:
         class_data.append(format_size(self.size))
         class_data.append(self.resolution.get_resolution_str(True))
         class_data.append(f"{self.bppf:.02f}")
-        class_data.append(format_bitrate(self.bitrate))
+        class_data.append(format_bitrate(self.v_bitrate))
+        class_data.append(format_bitrate(self.a_bitrate))
 
         return class_data
 
@@ -185,9 +190,14 @@ class VideoMetrics:
 
         comp_data[VideoMetrics.LABELS.index("BPPF")] = f"{(self.bppf - new_metrics.bppf):.02f} : {100 * (1 - (new_metrics.bppf / self.bppf)):.02f}%"
 
-        if self.bitrate > 0 and new_metrics.bitrate > 0:
-            comp_data[VideoMetrics.LABELS.index("Bitrate")] = (
-                f"{format_bitrate(self.bitrate - new_metrics.bitrate)} : {100 * (1 - (new_metrics.bitrate / self.bitrate)):.02f}%"
+        if self.v_bitrate > 0 and new_metrics.v_bitrate > 0:
+            comp_data[VideoMetrics.LABELS.index("V_Bitrate")] = (
+                f"{format_bitrate(self.v_bitrate - new_metrics.v_bitrate)} : {100 * (1 - (new_metrics.v_bitrate / self.v_bitrate)):.02f}%"
+            )
+
+        if self.a_bitrate > 0 and new_metrics.a_bitrate > 0:
+            comp_data[VideoMetrics.LABELS.index("A_Bitrate")] = (
+                f"{format_bitrate(self.a_bitrate - new_metrics.a_bitrate)} : {100 * (1 - (new_metrics.a_bitrate / self.a_bitrate)):.02f}%"
             )
 
         return comp_data
