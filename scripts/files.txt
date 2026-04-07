@@ -1,0 +1,170 @@
+ Volume in drive F is MEDIA 2
+ Volume Serial Number is F8E4-2574
+
+ Directory of f:\dev\python\scripts
+
+2025-11-09  07:41 AM             2,321 cleaner.py
+2025-10-18  06:20 PM            14,116 delta_calc_encode.py
+2025-11-11  12:10 PM             5,053 dupe_find.py
+2025-10-13  11:55 PM            10,236 file_type_reorg.py
+2025-09-27  12:51 PM             4,663 gen_scr3.py
+2025-10-04  12:06 AM             2,152 img_res.py
+2026-01-01  04:26 AM               611 scratchpad.py
+2025-10-08  01:53 PM             2,348 sixr_sub2.py
+2025-09-29  01:26 PM             1,497 size_sub.py
+2025-10-10  12:09 AM             3,372 subs_find.py
+2025-10-10  10:54 PM             2,550 sub_sizes.py
+2025-11-17  03:55 AM             1,192 test.py
+2025-10-09  11:57 PM             4,362 torrent_restore.py
+2025-10-19  09:28 AM            20,573 video_dupe_finder.py
+2025-10-23  12:33 AM                 0 __init__.py
+              15 File(s)         75,046 bytes
+
+ Directory of f:\dev\python\scripts\ihb_archive
+
+2025-10-13  10:46 PM             6,144 coomer.py
+2025-09-20  06:33 PM             2,487 gen_scr.py
+2025-09-23  04:36 PM             4,671 gen_scr2.py
+2025-10-13  08:45 PM             5,707 simpcity.py
+               4 File(s)         19,009 bytes
+
+ Directory of f:\dev\python\scripts\ihb_deluge
+
+2025-12-11  03:10 AM             2,288 deluge_exec.py
+2025-12-08  08:14 PM                 0 __init__.py
+               2 File(s)          2,288 bytes
+
+ Directory of f:\dev\python\scripts\ihb_encode
+
+2026-01-03  05:22 PM             3,981 main.py
+2025-12-17  03:23 AM                 0 __init__.py
+               2 File(s)          3,981 bytes
+
+ Directory of f:\dev\python\scripts\ihb_encode\conf
+
+2025-12-17  03:41 AM               841 config.py
+2025-12-17  03:23 AM                 0 __init__.py
+               2 File(s)            841 bytes
+
+ Directory of f:\dev\python\scripts\ihb_encode\core
+
+2025-12-29  09:23 PM             5,006 db_tools.py
+2026-01-03  06:33 PM             2,207 encoder.py
+2026-01-03  05:17 PM             9,838 job_manager.py
+2026-01-03  06:48 PM             8,572 user_prompts.py
+2025-12-17  03:23 AM                 0 __init__.py
+               5 File(s)         25,623 bytes
+
+ Directory of f:\dev\python\scripts\ihb_encode\data
+
+2026-01-02  05:27 AM             4,957 db_manager.py
+2026-01-03  05:30 PM             4,173 types.py
+2025-12-20  05:31 PM                57 __init__.py
+               3 File(s)          9,187 bytes
+
+ Directory of f:\dev\python\scripts\ihb_encode\scripts
+
+2025-12-22  07:46 PM             1,035 insert.py
+2025-12-27  03:27 PM             2,062 schema.py
+2025-12-22  03:08 AM               129 seed_data.py
+2026-01-03  06:31 AM             1,081 select.py
+2025-12-24  05:08 PM               233 update.py
+2025-12-20  02:23 AM                 2 __init__.py
+               6 File(s)          4,542 bytes
+
+ Directory of f:\dev\python\scripts\ihb_ext
+
+2026-01-03  05:24 PM            10,467 ffmpeg.py
+2026-01-03  06:46 PM             5,318 ffmpeg_utils.py
+2026-01-03  04:53 PM             3,041 ffmpeg_validator.py
+2026-01-03  04:17 PM             3,983 ffprobe.py
+2025-11-19  09:10 AM             1,693 galley_dl.py
+2025-11-20  06:29 PM             3,534 mkvtools.py
+2025-11-26  02:50 PM             2,992 mp4box.py
+2026-01-03  04:49 PM             6,358 video_manager.py
+2025-11-28  05:33 PM               994 zip7.py
+2025-10-31  06:49 AM                 0 __init__.py
+              10 File(s)         38,380 bytes
+
+ Directory of f:\dev\python\scripts\ihb_misc
+
+2025-11-15  03:18 PM             3,020 dupe_cleaner.py
+2025-11-20  08:23 PM             3,824 zip_dir.py
+2025-11-15  09:13 AM                 0 __init.py
+               3 File(s)          6,844 bytes
+
+ Directory of f:\dev\python\scripts\ihb_site_downloader
+
+2025-11-19  06:40 AM               930 coomer-fansly.py
+2025-12-17  03:56 PM             1,046 coomer-of.py
+2025-11-19  09:59 AM             2,428 default_site_functions.py
+2025-11-14  02:26 PM             1,972 simpcity.py
+2025-12-17  03:42 PM            12,181 site_downloader.py
+2025-10-23  12:26 AM                 0 __init__.py
+               6 File(s)         18,557 bytes
+
+ Directory of f:\dev\python\scripts\ihb_utils
+
+2025-12-30  09:44 PM               632 color_codes.py
+2025-12-17  09:41 PM               231 db_scripts.py
+2025-12-17  11:00 PM             2,276 db_utils.py
+2025-12-27  11:10 PM             5,382 dir_utils.py
+2025-12-30  03:21 AM             5,769 file_utils.py
+2025-12-30  10:37 AM             8,098 gen_utils.py
+2025-11-09  09:14 AM             1,595 subtitle_utils.py
+2026-01-03  06:45 AM             6,744 video_models.py
+2026-01-01  07:30 PM             5,664 video_utils.py
+2025-12-09  05:00 PM               466 _template.py
+2025-12-15  08:37 PM               127 _template_test.py
+2025-10-22  06:47 AM                 0 __init__.py
+              12 File(s)         36,984 bytes
+
+ Directory of f:\dev\python\scripts\ihb_video
+
+2025-12-11  12:33 AM             6,901 cc_default_setter.py
+2025-11-26  02:59 PM             3,186 cc_embedder.py
+2025-11-08  05:26 AM             8,048 concan.py
+2025-12-30  09:19 AM            16,206 concan_recode.py
+2025-12-30  06:38 PM             9,130 dupe_length_finder.py
+2025-12-30  09:19 AM             6,363 encode.py
+2025-12-16  12:57 PM             1,899 freeze_finder.py
+2025-11-14  02:38 PM             1,821 max_size.py
+2025-11-01  09:04 AM                 0 __init__.py
+               9 File(s)         53,554 bytes
+
+ Directory of f:\dev\python\scripts\ihb_video_tools
+
+2025-12-17  09:51 PM             2,388 main.py
+2025-12-08  02:27 AM                 0 __init__.py
+               2 File(s)          2,388 bytes
+
+ Directory of f:\dev\python\scripts\ihb_video_tools\conf
+
+2025-12-17  09:51 PM             1,166 config.py
+2025-12-09  07:22 PM                 0 __init__.py
+               2 File(s)          1,166 bytes
+
+ Directory of f:\dev\python\scripts\ihb_video_tools\core
+
+2025-12-30  06:38 PM             4,632 duplicates.py
+2025-12-18  10:26 AM             3,262 processor.py
+2025-12-08  09:43 PM                 0 __init__.py
+               3 File(s)          7,894 bytes
+
+ Directory of f:\dev\python\scripts\ihb_video_tools\data
+
+2025-12-17  07:44 PM             6,827 db_manager.py
+2025-12-14  07:58 PM             2,862 dto.py
+2025-12-08  09:43 PM                 0 __init__.py
+               3 File(s)          9,689 bytes
+
+ Directory of f:\dev\python\scripts\ihb_video_tools\scripts
+
+2025-12-20  12:46 AM             1,189 data.py
+2025-12-14  08:10 PM               852 schema.py
+2025-12-08  09:43 PM                 0 __init__.py
+               3 File(s)          2,041 bytes
+
+     Total Files Listed:
+              92 File(s)        318,014 bytes
+               0 Dir(s)   8,819,597,312 bytes free
