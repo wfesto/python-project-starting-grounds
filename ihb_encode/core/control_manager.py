@@ -47,7 +47,7 @@ def _start_jobs(*args, **kwargs):
 
 @ControlManager.register_command("enable-stop")
 def _enable_stop_signal(*args, **kwargs):
-    if not os.path.exists(STOP_FILE):
+    if not _check_stop_signal():
         with open(STOP_FILE, "x") as f:
             logger.info("STOP signal enabled")
     else:

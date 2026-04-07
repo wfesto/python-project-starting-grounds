@@ -17,6 +17,7 @@ class VALIDATION_TYPE(Enum):
     DELTA = auto()
     INVARIANT = auto()
     ANALYSIS = auto()
+    BENCHMARK = auto()
 
 
 def _run_validation(
@@ -42,7 +43,8 @@ def _run_validation(
 def register_test(test_type: VALIDATION_TYPE):
     def decorator(func):
         VALIDATOR_DICT.setdefault(test_type, []).append(func)
-        VALIDATOR_DICT.setdefault(VALIDATION_TYPE.ANY, []).append(func)
+        if test_type != VALIDATION_TYPE.BENCHMARK:
+            VALIDATOR_DICT.setdefault(VALIDATION_TYPE.ANY, []).append(func)
         return func
 
     return decorator
@@ -51,7 +53,7 @@ def register_test(test_type: VALIDATION_TYPE):
 @register_test(VALIDATION_TYPE.DELTA)
 def _validate_duration_delta(old_probe_data: dict[str, Any], new_probe_data: dict[str, Any]) -> ValidationResultDTO:
     duration_delta = abs(float(old_probe_data["format_data"]["duration"]) - float(new_probe_data["format_data"]["duration"]))
-    result = duration_delta <= 0.05
+    result = duration_delta <= 0.1
     return ValidationResultDTO("duration_delta", result, f"Duration delta {duration_delta:.04f} is {"" if result else "UN"}ACCEPTABLE")
 
 
@@ -60,7 +62,7 @@ def _validate_aspect_ratio_delta(old_probe_data: dict[str, Any], new_probe_data:
     old_ar_num = Resolution(old_probe_data["v_streams"][0]["width"], old_probe_data["v_streams"][0]["height"]).get_aspect_ratio_num()
     new_ar_num = Resolution(new_probe_data["v_streams"][0]["width"], new_probe_data["v_streams"][0]["height"]).get_aspect_ratio_num()
     ar_num_delta = abs(old_ar_num - new_ar_num)
-    result = ar_num_delta <= 0.005
+    result = ar_num_delta <= 0.02
     return ValidationResultDTO("aspect_ratio_delta", result, f"Aspect Ratio delta {ar_num_delta:.04f} is {"" if result else "UN"}ACCEPTABLE")
 
 

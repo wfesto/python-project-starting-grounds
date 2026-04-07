@@ -1,4 +1,4 @@
-import os
+import logging
 import re
 from typing import Any, Dict
 
@@ -8,17 +8,14 @@ from ihb_common.utils.gen_utils import format_time
 from ihb_encode.data import *
 from ihb_video.utils.video_utils import EncodingProfile
 
+logger = logging.getLogger(__name__)
+
 FFMPEG_UPDATE_STR_REGEX = re.compile(r"(.*size=)\s*(\d*)(\w*)\s(.*time=)(\d+:\d+:\d+\.\d+)(\s+.*elapsed=)(\d+:\d+:\d+\.\d+)")
 UPDATE_STR_SIZE_DIGIT_IDX = 2
 UPDATE_STR_SIZE_DIGIT_UNIT = 3
 UPDATE_STR_TIME_IDX = 5
 UPDATE_STR_TIME_ELAPS_IDX = 7
 FFMPEG_BINARY = "ffmpeg"
-INDETERMINATE_VALUES = ["unknown", "unspecified", "default"]
-LEGACY_COLOR_CODES = {
-    "bt470m": "bt709",
-    "smpte170m": "bt709",
-}
 NEW_EXT = ".mkv"
 
 
@@ -26,7 +23,7 @@ ENCODE_COMMAND = """
 {COMMAND} -nostdin {PTS_VIDEO_FLAGS} -i {INPUT_FILE_PATH} -map 0:v:0 {TAR_FPS} {MAP_AUDIO} {MAP_SUBS}
 -c:v libx265 -crf {CRF} -preset {PRESET} {THREAD_LIMIT} -vf {DEINTERLACING}{NOISE_REDUCTION}scale={TARGET_RES},setsar=1:1,setdar={DAR_FRACTION},format=yuv420p10le 
 -profile:v main10 -x265-params "aq-mode=3:sao=0:strong-intra-smoothing=0:rc-lookahead=100{PARAMS_X265}" {COLOR_FLAGS}
-{AUDIO_COMMANDS} {PTS_AUDIO_FLAGS} {SUBTITLE_COPY} -map_metadata -1
+{AUDIO_COMMANDS} {PTS_AUDIO_FLAGS} {SUBTITLE_COPY} {METADATA_MAP}
 -y {OUTPUT_FILE_PATH}"""
 
 ENCODE_DEFAULTS = {
@@ -48,11 +45,14 @@ ENCODE_DEFAULTS = {
     "AUDIO_COMMANDS": "",
     "PTS_AUDIO_FLAGS": "",
     "SUBTITLE_COPY": "",
+    "METADATA_MAP": "-map_metadata -1",
     "OUTPUT_FILE_PATH": "",
 }
 
 
-def populate_encode_params(probe_data: Dict[str, Any], profile: EncodingProfile, adv_options: Advanced_Options_DTO) -> Dict[str, str]:
+def populate_encode_params(
+    probe_data: Dict[str, Any], profile: EncodingProfile, adv_options: Advanced_Options_DTO, config: dict[str, Any], force_color_code_mapping: bool = False
+) -> Dict[str, str]:
     encode_params = ENCODE_DEFAULTS.copy()
 
     format_data = probe_data["format_data"]
@@ -72,6 +72,15 @@ def populate_encode_params(probe_data: Dict[str, Any], profile: EncodingProfile,
 
     # -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv
     RANGE_MAP = {"limited": "tv", "full": "pc"}
+    INDETERMINATE_VALUES = ["unknown", "unspecified", "default"]
+    LEGACY_COLOR_CODES = (
+        {
+            "bt470m": "bt709",
+            "smpte170m": "bt709",
+        }
+        if force_color_code_mapping
+        else {}
+    )
 
     color_parts = []
 
@@ -94,8 +103,23 @@ def populate_encode_params(probe_data: Dict[str, Any], profile: EncodingProfile,
     if color_parts:
         encode_params["COLOR_FLAGS"] = " ".join(color_parts)
 
+    # if a_stream:
+    #   encode_params["AUDIO_COMMANDS"] = "-c:a:0 copy" if a_stream.get("codec_name").lower() in ("aac", "ac3") else "-c:a:0 aac -ac 2 -b:a 128k"
+
     if a_stream:
-        encode_params["AUDIO_COMMANDS"] = "-c:a:0 copy" if a_stream.get("codec_name").lower() in ("aac", "ac3") else "-c:a:0 aac -ac 2 -b:a 128k"
+        codec = a_stream.get("codec_name", "").lower()
+        try:
+            bitrate_str = a_stream.get("bit_rate")
+            bitrate = int(bitrate_str) if bitrate_str and bitrate_str != "N/A" else None
+        except (ValueError, TypeError):
+            bitrate = None
+
+        max_bitr = float(config["max_audio_kbps"]) * 1000 * (1 + (float(config["max_audio_tolerance"] / 100.0)))
+
+        if bitrate is not None and codec in config["audio_codecs_keep"] and bitrate <= max_bitr and 1 <= int(a_stream.get("channels", -1)) <= 2:
+            encode_params["AUDIO_COMMANDS"] = "-c:a:0 copy"
+        else:
+            encode_params["AUDIO_COMMANDS"] = f"-c:a:0 aac -ac 2 -b:a {config["target_audio_kbps"]}k"
 
     if has_subs:
         encode_params["SUBTITLE_COPY"] = "-c:s copy"
