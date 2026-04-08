@@ -1,11 +1,10 @@
 insert_table_jobs = """
-    insert into jobs (input, output, profile, adv_params, duration, size_in, size_out, status) 
-        VALUES (:input, :output, :profile, :adv_params, :duration, :size_in, :size_out, :status)
+    insert into jobs (input, output, profile, duration, size_in, size_out, status) 
+        VALUES (:input, :output, :profile, :duration, :size_in, :size_out, :status)
     ON CONFLICT (input)
     DO UPDATE SET
         output = excluded.output,
         profile = excluded.profile,
-        adv_params = excluded.adv_params,
         size_out = excluded.size_out,
         status = excluded.status
     RETURNING *

@@ -59,6 +59,7 @@ class Job_Status(IntEnum):
     MAN_APPR = auto()
     DELETED = auto()
     CANCELLED = auto()
+    POST_PROC = auto()
     UNKNOWN = 99
 
     def to_sql_params(self, language: str) -> dict[str, Any]:
@@ -80,7 +81,6 @@ class Encoding_Job_DTO:
     size_out: int = None
     status: Job_Status = None
     notes: dict[str, Any] = field(default_factory=dict)
-    adv_params: Advanced_Options_DTO = None
 
     def to_pretty_string(self):
         return f"{format_time(self.duration)} \t {format_size(self.size_in)}\t{self.profile.name}\t{self.job_id}\t{os.path.basename(self.input)}"
@@ -96,11 +96,6 @@ class Encoding_Job_DTO:
 
         if x_status := db_params.pop("status", None):
             db_params["status"] = x_status.value
-
-        db_params["adv_params"] = None
-        if self.adv_params:
-            if adv_param_str := self.adv_params.to_db_str():
-                db_params["adv_params"] = adv_param_str
 
         return db_params
 
@@ -122,14 +117,3 @@ class Encoding_Job_DTO:
             job_dto.notes = {}
 
         return job_dto
-
-
-@dataclass
-class Advanced_Options_DTO:
-    use_limit_threads: bool = False
-    use_deinterlacing: bool = False
-    use_noise_reduction: bool = False
-
-    def to_db_str(self):
-        if enabled_adv_opts := [key for key, value in asdict(self).items() if value]:
-            return f'{{"adv_opts":{enabled_adv_opts}}}'

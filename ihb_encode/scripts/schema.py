@@ -14,7 +14,6 @@ def _create_table_jobs():
         input TEXT UNIQUE NOT NULL,
         output TEXT,
         profile TEXT,
-        adv_params TEXT,
         duration REAL,
         size_in INTEGER,
         size_out INTEGER,

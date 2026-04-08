@@ -51,7 +51,7 @@ ENCODE_DEFAULTS = {
 
 
 def populate_encode_params(
-    probe_data: Dict[str, Any], profile: EncodingProfile, adv_options: Advanced_Options_DTO, config: dict[str, Any], force_color_code_mapping: bool = False
+    probe_data: Dict[str, Any], profile: EncodingProfile, config: dict[str, Any], force_color_code_mapping: bool = False
 ) -> Dict[str, str]:
     encode_params = ENCODE_DEFAULTS.copy()
 
@@ -123,11 +123,6 @@ def populate_encode_params(
 
     if has_subs:
         encode_params["SUBTITLE_COPY"] = "-c:s copy"
-
-    if adv_options:
-        encode_params["THREAD_LIMIT"] = "-threads 1" if adv_options.use_limit_threads else ""
-        encode_params["DEINTERLACING"] = "bwdif=mode=send_frame:parity=auto:deint=all," if adv_options.use_deinterlacing else ""
-        encode_params["NOISE_REDUCTION"] = "vaguedenoiser=threshold=3:method=soft:nsteps=6," if adv_options.use_noise_reduction else ""
 
     return encode_params
 

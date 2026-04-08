@@ -7,7 +7,7 @@ from queue import PriorityQueue
 from typing import Any
 
 from ihb_common.utils.file_utils import recycle_file
-from ihb_common.utils.gen_utils import generate_aligned_table
+from ihb_common.utils.gen_utils import VERBOSE_LEVEL_NUM, generate_aligned_table
 from ihb_components.cli.cli_utils import BaseWorkflowManager, CliArgument
 from ihb_video.manager import video_manager
 from ihb_video.types.video_models import VideoMetrics
@@ -212,7 +212,7 @@ def review_results(*args, **kwargs):
 
     while True:
         try:
-            if item := job_queue.get(timeout=30):
+            if item := job_queue.get():
                 neg_job_size, job_id, review_job, preprocess_results = item
                 logger.verbose(f"Next Job: {job_id}, size: {format_size(-1 * neg_job_size)}")
             else:
@@ -283,7 +283,6 @@ def _generate_job_dto(input_metadata: dict[str, Any], output_dir: str, profile: 
         logger.error(f"Invalid output directory: {output_dir}")
         return False
 
-    adv_opts = Advanced_Options_DTO()
     if not profile:
         profile = user_prompts.prompt_encoding_profile(input_metadata, adv_opts)
 
@@ -295,13 +294,11 @@ def _generate_job_dto(input_metadata: dict[str, Any], output_dir: str, profile: 
         input=input_file_path,
         output=output_dir,
         profile=profile,
-        adv_params=adv_opts,
         duration=input_metadata["format_data"]["duration"],
         size_in=input_metadata["format_data"]["size"],
     )
 
-    logger.verbose(f"Chosen profile: {profile}")
-    logger.verbose(f"Advanced Options: {adv_opts}")
+    logger.level(VERBOSE_LEVEL_NUM, f"Chosen profile: {profile}")
 
     return encoding_params
 
