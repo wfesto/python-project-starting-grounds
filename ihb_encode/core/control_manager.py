@@ -50,6 +50,7 @@ def _enable_stop_signal(*args, **kwargs):
     if not _check_stop_signal():
         with open(STOP_FILE, "x") as f:
             logger.info("STOP signal enabled")
+        _check_stop_signal()
     else:
         logger.info("STOP signal already enabled")
 
@@ -59,6 +60,7 @@ def _disable_stop_signal(*args, **kwargs):
     if _check_stop_signal():
         os.remove(STOP_FILE)
         logger.info("STOP signal disabled")
+    _check_stop_signal()
 
 
 @ControlManager.register_command("check-stop")
