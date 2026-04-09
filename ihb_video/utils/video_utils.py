@@ -17,8 +17,11 @@ logger = logging.getLogger("__name__")
 VIDEO_EXTENSIONS = (".avi", ".flv", ".f4v", ".mkv", ".mov", ".mpeg", ".mpg", ".mp4", ".m4v", ".webm", ".wmv")
 AV_EXTENSIONS = (".mpeg", ".mpg", ".mp4", ".webm")
 
+
 RES_REGEX = re.compile(r"(?i)[ \{\-_\[\(\.]*(?:480|720|1080|1920|2160|2k|4k)p?[ \}\-_\]\)\.]*")
-REPLACE_REGEX = re.compile(r"[ _-]")
+REPLACE_REGEX = re.compile(r"[ _\-\!\?\,\;\"\\]")
+REMOVE_REGEX = re.compile(r"[\'\']")
+AMP_REGEX = re.compile(r"\&")
 CLEAN_REGEX = re.compile(r"[\.]{2,}")
 
 
@@ -29,7 +32,9 @@ def remove_res_from_file_name(file_name: str, new_res: str = "", new_ext: str = 
     file_root, ext = os.path.splitext(file_name)
 
     file_root = re.sub(RES_REGEX, repl=".", string=file_root)
+    file_root = re.sub(REMOVE_REGEX, repl="", string=file_root)
     file_root = re.sub(REPLACE_REGEX, repl=".", string=file_root)
+    file_root = re.sub(AMP_REGEX, repl=".and.", string=file_root)
     final_ext = new_ext or ext
     file_root = re.sub(CLEAN_REGEX, repl=".", string=f"{file_root}.{new_res}{final_ext}")
 
@@ -145,7 +150,7 @@ def _build_chapter_file(file_path: str, probe_datas: list) -> str:
 
 
 def format_bitrate(bitrate: float) -> str:
-    if not bitrate:
+    if not bitrate or abs(bitrate) < 1:
         return "N/A"
 
     sign = "-" if bitrate < 0 else ""
