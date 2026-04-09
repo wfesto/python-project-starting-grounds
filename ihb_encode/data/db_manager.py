@@ -116,11 +116,26 @@ def create_db():
         insert_seed_data()
 
 
+def select_all_status(lang: str = "eng") -> list[str]:
+    with sqlite3.connect(get_config()["db_conn"]) as db:
+        cursor = db.cursor()
+        cursor.row_factory = sqlite3.Row
+        cursor.execute(seed_data.select_all_status, {"language": lang})
+        rows = list(cursor.fetchall())
+
+        ret_strs = list(dict(row) for row in rows)
+        return ret_strs
+
+
 def insert_seed_data():
+    insert_status()
+
+
+def insert_status():
     with sqlite3.connect(get_config()["db_conn"]) as db:
         cursor = db.cursor()
 
-        sql_param_list = [status.to_sql_params("en") for status in Job_Status]
+        sql_param_list = [status.to_sql_params("eng") for status in Job_Status]
         cursor.executemany(seed_data.insert_status, sql_param_list)
 
         db.commit()

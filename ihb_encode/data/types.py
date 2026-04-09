@@ -14,13 +14,13 @@ from ihb_common.utils.gen_utils import format_time
 @dataclass(frozen=True)
 class EncodingProfile:
     name: str
-    resolution: str
+    version: int
+    is_active: bool
     fixed_dim: int
-    scaled_dim: int
-    crf: int
+    crf: float
     encoder_preset: str
-    params_x265: list[str]
     is_source: bool
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 class Profile(Enum):
@@ -49,20 +49,20 @@ def get_profile(input: str | int) -> EncodingProfile | None:
 
 
 class Job_Status(IntEnum):
-    INIT = auto()
-    PENDING = auto()
-    IND_JOB = auto()
-    WORKING = auto()
-    REVIEW = auto()
-    COMPLETE = auto()
-    ERROR = auto()
-    MAN_APPR = auto()
-    DELETED = auto()
-    CANCELLED = auto()
-    POST_PROC = auto()
+    INIT = 1
+    PENDING = 2
+    IND_JOB = 3
+    WORKING = 4
+    REVIEW = 5
+    COMPLETE = 6
+    ERROR = 7
+    MAN_APPR = 8
+    DELETED = 9
+    CANCELLED = 10
+    POST_PROC = 11
     UNKNOWN = 99
 
-    def to_sql_params(self, language: str) -> dict[str, Any]:
+    def to_sql_params(self, language: str = "eng") -> dict[str, Any]:
         sql_params = {}
         sql_params["status"] = self.value
         sql_params["status_name"] = self.name

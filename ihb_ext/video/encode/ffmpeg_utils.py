@@ -50,9 +50,7 @@ ENCODE_DEFAULTS = {
 }
 
 
-def populate_encode_params(
-    probe_data: Dict[str, Any], profile: EncodingProfile, config: dict[str, Any], force_color_code_mapping: bool = False
-) -> Dict[str, str]:
+def populate_encode_params(probe_data: Dict[str, Any], profile: EncodingProfile, config: dict[str, Any]) -> Dict[str, str]:
     encode_params = ENCODE_DEFAULTS.copy()
 
     format_data = probe_data["format_data"]
@@ -73,14 +71,10 @@ def populate_encode_params(
     # -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv
     RANGE_MAP = {"limited": "tv", "full": "pc"}
     INDETERMINATE_VALUES = ["unknown", "unspecified", "default"]
-    LEGACY_COLOR_CODES = (
-        {
-            "bt470m": "bt709",
-            "smpte170m": "bt709",
-        }
-        if force_color_code_mapping
-        else {}
-    )
+    LEGACY_COLOR_CODES = {
+        "bt470m": "bt709",
+        "smpte170m": "bt709",
+    }
 
     color_parts = []
 

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from humanfriendly import format_size
 
 from ihb_common.utils.file_utils import recycle_file
-from ihb_common.utils.gen_utils import generate_aligned_table
+from ihb_common.utils.gen_utils import VERBOSE_LEVEL_NUM, generate_aligned_table
 from ihb_components.cli.cli_utils import BaseWorkflowManager, CliArgument
 
 from ..data import *
@@ -150,6 +150,16 @@ def _print_job_by_status(*args, **kwargs):
     if job_status := int(kwargs.get("job_status", 0)):
         job_dto = db_manager.get_next_job_by_status(Job_Status(job_status))
         print(job_dto)
+
+
+@DbTools.register_command("update-seed-status")
+def _update_status_tabile(*args, **kwargs):
+    db_manager.insert_status()
+    status_rows = db_manager.select_all_status()
+    logger.log(VERBOSE_LEVEL_NUM, f"{'CODE':<6} | {'NAME':<15} | {'LANG':<5} | {'TS_MOD':<28}")
+    logger.log(VERBOSE_LEVEL_NUM, f"-" * 30)
+    for row in status_rows:
+        logger.log(VERBOSE_LEVEL_NUM, f"{row['status']:<6} | {row['status_name']:<15} | {row['language']:<5} | {row['ts_modified']:<28}")
 
 
 def reset_stopped_working_jobs():
